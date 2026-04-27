@@ -353,16 +353,27 @@ body{
 .sb-num-cell.num-closed-all{color:var(--red);text-decoration:line-through;}
 .sb-num-cell.num-scoring{color:var(--green);}
 .sb-row.all-closed{background:rgba(160,20,20,.15);}
-.sb-row.is-scoring{background:rgba(52,211,153,.12);}
 .sb-row.all-closed .sb-num-cell{color:var(--red);}
-.sb-row.is-scoring .sb-num-cell{color:var(--green);}
 
 .sb-mark-cell{
   display:flex;align-items:center;justify-content:center;
   position:relative;
-  transition:background .2s;
   background:var(--surface);
   border-radius:6px;
+  border:2px solid transparent;
+  transition:all .2s;
+}
+.sb-mark-cell.active-turn {
+  background:rgba(96,165,250,.06);
+  border-color:var(--blue2);
+}
+.sb-mark-cell.is-scoring-cell {
+  background:rgba(52,211,153,.15);
+  border-color:rgba(52,211,153,.4);
+}
+.sb-mark-cell.is-scoring-cell.active-turn {
+  background:rgba(52,211,153,.25);
+  border-color:var(--green);
 }
 .sb-mark-cell.just-hit{animation:cellFlash .5s ease-out;}
 @keyframes cellFlash{

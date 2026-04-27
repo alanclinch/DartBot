@@ -397,16 +397,16 @@ function updateScoreboard(){
       const cl = document.getElementById(`closedline-${num}-${i}`);
       if(cl) cl.classList.toggle('visible', marks >= 3);
       
+      const allClosedNum = players.every(op => op.marks[num] >= 3);
+      const canScore = marks >= 3 && !allClosedNum && gameVariant !== 'noscore';
+
       // Update column background active state logic
       const cellEl = document.getElementById(`mcell-${num}-${i}`);
       if(cellEl) {
-         if(i === currentPlayer) {
-             cellEl.style.backgroundColor = "rgba(96,165,250,.06)";
-             cellEl.style.borderColor = "var(--blue2)";
-         } else {
-             cellEl.style.backgroundColor = "";
-             cellEl.style.borderColor = "";
-         }
+         cellEl.classList.toggle('active-turn', i === currentPlayer);
+         cellEl.classList.toggle('is-scoring-cell', canScore);
+         cellEl.style.backgroundColor = "";
+         cellEl.style.borderColor = "";
       }
     });
   });
@@ -425,7 +425,7 @@ function updateScoreboard(){
     const row = document.getElementById(`row-${num}`);
     if(row) {
       row.classList.toggle('all-closed', allClosed);
-      row.classList.toggle('is-scoring', isScoring);
+      row.classList.remove('is-scoring');
     }
   });
 
