@@ -321,7 +321,8 @@ function renderPlayerList(){
   const html = players.map((p,i) => `
     <div class="player-row">
       <div class="flag-wrap">${renderFlag(p.flag)}</div>
-      <div class="player-rwu ? 'badge-cpu' : 'badge-human'}">${p.isCpu ? `CPU ${p.cpuData.mpr.toFixed(1)}` : 'HUMAN'}</div>
+      <div class="player-row-name">${escapeHTML(p.name)}</div>
+      <div class="player-row-badge ${p.isCpu ? 'badge-cpu' : 'badge-human'}">${p.isCpu ? `CPU ${p.cpuData.mpr.toFixed(1)}` : 'HUMAN'}</div>
       <button class="remove-btn" onclick="removePlayer(${i})">✕</button>
     </div>
   `).join('');
@@ -361,7 +362,9 @@ async function renderRecentPlayers(){
       return `<button class="recent-chip" onclick="addSavedPlayer(this, '${escapeHTML(n).replace(/'/g,"\\'")}', '${flag}')">
         <div style="width:24px;height:16px;margin-right:6px;">${renderFlag(flag)}</div> ${escapeHTML(n)}<span class="chip-stat">${mpr} MPR</span>
       </button>`;
-    e)
+    }).join('') : '';
+    
+  const el1 = document.getElementById('recent-players');
   const el2 = document.getElementById('recent-players-winner');
   if(el1) el1.innerHTML = html;
   if(el2) el2.innerHTML = html;
