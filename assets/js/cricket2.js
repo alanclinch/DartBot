@@ -66,6 +66,9 @@ async function initNeonDB() {
 
     sql = neon(connString);
     console.log('✅ Connected to Neon PostgreSQL Database!');
+    try {
+      await sql`ALTER TABLE players ADD COLUMN IF NOT EXISTS flag VARCHAR(10)`;
+    } catch(e) {}
     renderRecentPlayers();
   } catch (e) {
     console.error('❌ Failed to connect to Neon DB:', e);
@@ -92,23 +95,25 @@ function getSavedPlayers(){
   catch { return {}; }
 }
 
-async function savePlayerStat(name, won, marksThrown, dartsThrown){
+async function savePlayerStat(name, flag, won, marksThrown, dartsThrown){
   // 1. Keep LocalStorage as a fast local fallback
   const all = getSavedPlayers();
-  if(!all[name]) all[name] = { games:0, wins:0, marks:0, darts:0 };
+  if(!all[name]) all[name] = { games:0, wins:0, marks:0, darts:0, flag: flag || '👤' };
   all[name].games++;
   if(won) all[name].wins++;
   all[name].marks += marksThrown;
   all[name].darts += dartsThrown;
+  all[name].flag = flag;
   try { localStorage.setItem(LS_KEY, JSON.stringify(all)); } catch {}
 
   // 2. Sync permanently to Neon DB
   if (sql) {
     try {
       await sql`
-        INSERT INTO players (name, games, wins, marks, darts)
-        VALUES (${name}, 1, ${won ? 1 : 0}, ${marksThrown}, ${dartsThrown})
+        INSERT INTO players (name, flag, games, wins, marks, darts)
+        VALUES (${name}, ${flag}, 1, ${won ? 1 : 0}, ${marksThrown}, ${dartsThrown})
         ON CONFLICT (name) DO UPDATE SET
+          flag = EXCLUDED.flag,
           games = players.games + 1,
           wins = players.wins + ${won ? 1 : 0},
           marks = players.marks + ${marksThrown},
@@ -240,6 +245,7 @@ function buildCpuGrid(){
   g.innerHTML = CPU_PLAYERS.map(c => {
     const barW = Math.round((c.mpr / 6.5) * 100);
     return `<div class="cpu-pick-card" onclick="addCpuPlayer('${c.id}')">
+      <div style="font-size:28px; margin-bottom:-4px;">${c.flag}</div>
       <div class="cpu-pick-name">${c.name}</div>
       <div class="cpu-pick-mpr">MPR ${c.mpr.toFixed(1)}</div>
       <div class="cpu-mpr-bar"><div class="cpu-mpr-fill" style="width:${barW}%"></div></div>
@@ -255,19 +261,24 @@ function closeCpuModal(){
   document.getElementById('cpu-modal').classList.remove('open');
 }
 
-function addHumanPlayer(){
+function openHumanModal() {
   if(players.length >= 4) return;
-  humanCount++;
-  const name = `Player ${humanCount}`;
+  document.getElementById('new-human-name').value = '';
+  document.getElementById('human-modal').classList.add('open');
+  setTimeout(() => document.getElementById('new-human-name').focus(), 50);
+}
+function closeHumanModal() {
+  document.getElementById('human-modal').classList.remove('open');
+}
+function confirmAddHuman() {
+  const name = document.getElementById('new-human-name').value.trim();
+  if(!name) { alert('Please enter a name'); return; }
+  const flag = document.getElementById('new-human-flag').value;
   const color = PLAYER_COLORS[players.length % 6];
-  players.push({name, color, isCpu:false, cpuData:null, score:0, marks:{20:0,19:0,18:0,17:0,16:0,15:0,25:0}, dartsThrown:0, marksThrown:0, cpuMissStreak:0});
+  players.push({name, color, flag, isCpu:false, cpuData:null, score:0, marks:{20:0,19:0,18:0,17:0,16:0,15:0,25:0}, dartsThrown:0, marksThrown:0, cpuMissStreak:0});
+  closeHumanModal();
   renderPlayerList();
   checkStartBtn();
-  // Focus and select the new name field so user can type immediately
-  setTimeout(() => {
-    const inputs = document.querySelectorAll('.player-name-input');
-    if(inputs.length){ inputs[inputs.length-1].focus(); inputs[inputs.length-1].select(); }
-  }, 30);
 }
 
 function addCpuPlayer(id){
@@ -275,7 +286,7 @@ function addCpuPlayer(id){
   const cpu = CPU_PLAYERS.find(c => c.id === id);
   if(!cpu) return;
   const color = PLAYER_COLORS[players.length % 6];
-  players.push({name:cpu.name, color, isCpu:true, cpuData:cpu, score:0, marks:{20:0,19:0,18:0,17:0,16:0,15:0,25:0}, dartsThrown:0, marksThrown:0, cpuMissStreak:0});
+  players.push({name:cpu.name, color, flag:cpu.flag, isCpu:true, cpuData:cpu, score:0, marks:{20:0,19:0,18:0,17:0,16:0,15:0,25:0}, dartsThrown:0, marksThrown:0, cpuMissStreak:0});
   closeCpuModal();
   renderPlayerList();
   checkStartBtn();
@@ -292,10 +303,8 @@ function removePlayer(idx){
 function renderPlayerList(){
   const html = players.map((p,i) => `
     <div class="player-row">
-      <div class="pmini-wrap">${p.isCpu ? makeFaceSVG(p.cpuData.face,42) : humanAvatarSVG(p.color,42)}</div>
-      ${p.isCpu
-        ? `<div class="player-row-name">${escapeHTML(p.name)}</div>`
-        : `<input class="player-name-input" data-idx="${i}" maxlength="14" value="${escapeHTML(p.name)}" placeholder="Enter your name"/>`}
+      <div class="flag-wrap">${p.flag}</div>
+      <div class="player-row-name">${escapeHTML(p.name)}</div>
       <div class="player-row-badge ${p.isCpu ? 'badge-cpu' : 'badge-human'}">${p.isCpu ? `CPU ${p.cpuData.mpr.toFixed(1)}` : 'HUMAN'}</div>
       <button class="remove-btn" onclick="removePlayer(${i})">✕</button>
     </div>
@@ -306,26 +315,17 @@ function renderPlayerList(){
   if(list1) list1.innerHTML = html;
   if(list2) list2.innerHTML = html;
 
-  // Attach live name-sync to each input
-  document.querySelectorAll('.player-name-input').forEach(inp => {
-    const idx = parseInt(inp.dataset.idx);
-    inp.addEventListener('input', e => {
-      players[idx].name = e.target.value.trim() || `Player ${idx + 1}`;
-    });
-  });
   const maxed = players.length >= 4;
   document.querySelectorAll('.add-human-btn').forEach(b => b.disabled = maxed);
   document.querySelectorAll('.add-cpu-btn').forEach(b => b.disabled = maxed);
   renderRecentPlayers();
 }
 
-// humanAvatarSVG — from bots.js
-
 async function renderRecentPlayers(){
   let saved = {};
   if (sql) {
     try {
-      const rows = await sql`SELECT name, games, wins, marks, darts FROM players ORDER BY games DESC LIMIT 10`;
+      const rows = await sql`SELECT name, flag, games, wins, marks, darts FROM players ORDER BY games DESC LIMIT 10`;
       rows.forEach(r => saved[r.name] = r);
     } catch (e) { console.error(e); saved = getSavedPlayers(); }
   } else {
@@ -341,8 +341,9 @@ async function renderRecentPlayers(){
     suggestions.map(n => {
       const s = saved[n];
       const mpr = savedMPR(s);
-      return `<button class="recent-chip" onclick="addSavedPlayer(this, '${escapeHTML(n).replace(/'/g,"\\'")}')">
-        ${escapeHTML(n)}<span class="chip-stat">${mpr} MPR</span>
+      const flag = s.flag || '👤';
+      return `<button class="recent-chip" onclick="addSavedPlayer(this, '${escapeHTML(n).replace(/'/g,"\\'")}', '${flag}')">
+        ${flag} ${escapeHTML(n)}<span class="chip-stat">${mpr} MPR</span>
       </button>`;
     }).join('') : '';
     
@@ -352,11 +353,11 @@ async function renderRecentPlayers(){
   if(el2) el2.innerHTML = html;
 }
 
-function addSavedPlayer(btn, name){
+function addSavedPlayer(btn, name, flag = '👤'){
   if(players.length >= 4) return;
   const color = PLAYER_COLORS[players.length % 6];
   humanCount++;
-  players.push({name, color, isCpu:false, cpuData:null, score:0, marks:{20:0,19:0,18:0,17:0,16:0,15:0,25:0}, dartsThrown:0, marksThrown:0, cpuMissStreak:0});
+  players.push({name, color, flag, isCpu:false, cpuData:null, score:0, marks:{20:0,19:0,18:0,17:0,16:0,15:0,25:0}, dartsThrown:0, marksThrown:0, cpuMissStreak:0});
   renderPlayerList();
   renderRecentPlayers();
   checkStartBtn();
@@ -371,13 +372,6 @@ function checkStartBtn(){
 }
 
 function syncPlayerNames() {
-  const activeScreen = document.querySelector('.screen.active');
-  if (activeScreen) {
-    activeScreen.querySelectorAll('.player-name-input').forEach(inp => {
-      const idx = parseInt(inp.dataset.idx);
-      if(!isNaN(idx)) players[idx].name = inp.value.trim() || `Player ${idx+1}`;
-    });
-  }
 }
 
 // =============================================
@@ -385,7 +379,6 @@ function syncPlayerNames() {
 // =============================================
 function startGame(){
   if(players.length < 2) return;
-  syncPlayerNames();
   legNumber = 0;
   startingPlayer = Math.floor(Math.random() * players.length);
   launchLeg();
@@ -420,7 +413,6 @@ function launchLeg(){
 
 function nextLeg(){
   if(players.length < 2) return;
-  syncPlayerNames();
   legNumber++;
   startingPlayer = (startingPlayer + 1) % players.length;
   launchLeg();
@@ -1072,7 +1064,6 @@ document.addEventListener('keydown', e => {
 document.addEventListener('DOMContentLoaded', () => {
   initNeonDB();
   buildCpuGrid();
-  addHumanPlayer(); // start with one human (focuses name input)
   renderRecentPlayers();
   initSpeech();
   initAutodarts(handleWS);
