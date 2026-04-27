@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cricket 2 — Autodarts</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/game.css">
+<script src="../assets/js/autodarts.js"></script>
+<script src="../assets/js/utils.js"></script>
+<script src="../assets/js/bots.js"></script>
+<link rel="stylesheet" href="../assets/css/cricket2.css">
+</head>
+<body>
+
+<!-- SETUP -->
+<div id="setup" class="screen active">
+  <div class="setup-title">CRICKET 2 <span>🎯</span></div>
+
+  <div class="setup-card">
+    <h3>Game Variant</h3>
+    <div class="variant-grid">
+      <button class="variant-btn sel" data-v="standard" onclick="selectVariant('standard',this)">Standard</button>
+      <button class="variant-btn" data-v="cutthroat" onclick="selectVariant('cutthroat',this)">Cut-throat</button>
+      <button class="variant-btn" data-v="noscore" onclick="selectVariant('noscore',this)">No-score</button>
+    </div>
+    <div class="variant-desc" id="variant-desc">Close 20→15 & Bull. Score points on open numbers. First to close all with highest score wins.</div>
+  </div>
+
+  <div class="setup-card">
+    <h3>Players <span id="player-count-label" style="color:var(--muted);font-size:12px;">(1–4)</span></h3>
+    <div id="player-list"></div>
+    <div class="add-btns">
+      <button class="add-btn" id="add-human-btn" onclick="addHumanPlayer()">+ Human Player</button>
+      <button class="add-btn" id="add-cpu-btn" onclick="openCpuModal()">+ Computer Player</button>
+    </div>
+    <div id="recent-players" class="recent-players"></div>
+  </div>
+
+  <div class="setup-card">
+    <h3>Connection</h3>
+    <div class="ws-row">
+      <div class="ws-dot" id="setup-ws-dot"></div>
+      <div class="ws-label" id="setup-ws-label">Autodarts: Not Connected</div>
+    </div>
+    <div style="margin-top:16px;">
+      <div class="ws-label" style="margin-bottom:8px;letter-spacing:2px;">Caller Voice</div>
+      <select id="voice-picker" class="voice-select" onchange="setVoice(this.value)">
+        <option>Loading voices…</option>
+      </select>
+    </div>
+  </div>
+
+  <button class="start-btn" id="start-btn" onclick="startGame()" disabled>START GAME</button>
+</div>
+
+<!-- CPU MODAL -->
+<div id="cpu-modal">
+  <div class="cpu-modal-box">
+    <h2>SELECT OPPONENT</h2>
+    <div class="cpu-grid" id="cpu-grid"></div>
+    <button class="cpu-modal-cancel" onclick="closeCpuModal()">Cancel</button>
+  </div>
+</div>
+
+<!-- GAME -->
+<div id="game" class="screen">
+  <div id="scoreboard">
+    <div class="sb-top" id="sb-top"></div>
+    <div class="sb-body" id="sb-body"></div>
+  </div>
+  <div id="side-panel">
+    <div>
+      <div class="panel-label">Current Turn</div>
+      <div class="turn-info">
+        <div class="turn-player" id="turn-player-name">—</div>
+        <div class="turn-sub" id="turn-sub">Throw your darts</div>
+      </div>
+    </div>
+    <div>
+      <div class="panel-label">Darts</div>
+      <div class="dart-slots" id="dart-slots">
+        <div class="dart-slot" id="ds0"><div class="dart-slot-label">1ST</div><div class="dart-slot-val">—</div></div>
+        <div class="dart-slot" id="ds1"><div class="dart-slot-label">2ND</div><div class="dart-slot-val">—</div></div>
+        <div class="dart-slot" id="ds2"><div class="dart-slot-label">3RD</div><div class="dart-slot-val">—</div></div>
+      </div>
+    </div>
+    <div>
+      <div class="panel-label">Aim For</div>
+      <div class="target-box">
+        <div class="target-label">TARGET</div>
+        <div class="target-val" id="target-val">20</div>
+      </div>
+    </div>
+    <div>
+      <div class="panel-label">Round</div>
+      <div class="round-box">
+        <div class="round-num" id="round-num">1</div>
+        <div class="round-sub">ROUND</div>
+      </div>
+    </div>
+    <div class="variant-badge" id="game-variant-badge">STANDARD</div>
+    <div class="game-ws">
+      <div class="ws-dot" id="game-ws-dot"></div>
+      <div class="ws-label" id="game-ws-label">Not Connected</div>
+    </div>
+    <button class="end-btn" onclick="endGame()">End Game</button>
+  </div>
+</div>
+
+<!-- WINNER -->
+<div id="winner" class="screen">
+  <div class="winner-layout">
+    <div class="win-card">
+      <div class="win-trophy">🏆</div>
+      <div class="win-label">WINNER</div>
+      <div class="win-name" id="win-name">—</div>
+      <div class="win-score" id="win-details">—</div>
+    </div>
+    <div id="win-others"></div>
+    <div class="win-buttons">
+      <button class="win-btn win-btn-primary" onclick="nextLeg()">NEXT LEG</button>
+      <button class="win-btn" onclick="goToSetup()">ADJUST SETTINGS</button>
+      <button class="win-btn win-btn-danger" onclick="goToMenu()">MENU</button>
+    </div>
+  </div>
+</div>
+
+<div id="confetti"></div>
+<div id="announce"></div>
+<script src="../assets/js/cricket2.js"></script>
+</body>
+</html>
