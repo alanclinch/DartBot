@@ -66,6 +66,7 @@ async function initNeonDB() {
 
     sql = neon(connString);
     console.log('✅ Connected to Neon PostgreSQL Database!');
+    renderRecentPlayers();
   } catch (e) {
     console.error('❌ Failed to connect to Neon DB:', e);
   }
@@ -320,8 +321,17 @@ function renderPlayerList(){
 
 // humanAvatarSVG — from bots.js
 
-function renderRecentPlayers(){
-  const saved = getSavedPlayers();
+async function renderRecentPlayers(){
+  let saved = {};
+  if (sql) {
+    try {
+      const rows = await sql`SELECT name, games, wins, marks, darts FROM players ORDER BY games DESC LIMIT 10`;
+      rows.forEach(r => saved[r.name] = r);
+    } catch (e) { console.error(e); saved = getSavedPlayers(); }
+  } else {
+    saved = getSavedPlayers();
+  }
+
   const usedNames = new Set(players.filter(p => !p.isCpu).map(p => p.name));
   const suggestions = Object.keys(saved)
     .filter(n => !usedNames.has(n))
