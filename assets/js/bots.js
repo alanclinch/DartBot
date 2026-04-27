@@ -115,11 +115,20 @@ function generateCpuThrow(target, mpr, opts) {
   const prevSeg    = opts.prevSeg    || null;
   const missStreak = opts.missStreak || 0;
   const roundForm  = opts.roundForm  || 1.0;
+  const dartsThrown= opts.dartsThrown|| 0;
 
   // Base standard deviation (sigma) in mm. 
   // MPR 6.0 -> ~8mm spread, MPR 1.0 -> ~43mm spread
   let baseSigma = 50 - (7 * mpr);
-  baseSigma = Math.max(6, Math.min(60, baseSigma));
+
+  // Simulate "early game confidence" vs "late game pressure/fatigue".
+  // Darts 0-9: ~15% tighter variance (starts hot).
+  // Darts 20+: returns to baseline variance.
+  // Darts 45+: ~15% wider variance (struggling to close out).
+  const focusMultiplier = 0.85 + (Math.min(dartsThrown, 45) / 45) * 0.30;
+  baseSigma *= focusMultiplier;
+
+  baseSigma = Math.max(5, Math.min(65, baseSigma));
 
   // Apply roundForm (higher form = better throw = tighter variance)
   let currentSigma = baseSigma / roundForm;

@@ -649,6 +649,7 @@ function runCpuTurn(){
       prevSeg,
       missStreak: p.cpuMissStreak,
       roundForm,
+      dartsThrown: p.dartsThrown
     });
 
     // Update persistent miss streak on this CPU player
