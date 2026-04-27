@@ -414,10 +414,19 @@ function updateScoreboard(){
   // Number cells — red + strikethrough if all players closed
   NUMBERS.forEach(num => {
     const allClosed = players.every(p => p.marks[num] >= 3);
+    const anyClosed = players.some(p => p.marks[num] >= 3);
+    const isScoring = anyClosed && !allClosed && gameVariant !== 'noscore';
+
     const nc = document.getElementById(`numcell-${num}`);
-    if(nc) nc.classList.toggle('num-closed-all', allClosed);
+    if(nc) {
+      nc.classList.toggle('num-closed-all', allClosed);
+      nc.classList.toggle('num-scoring', isScoring);
+    }
     const row = document.getElementById(`row-${num}`);
-    if(row) row.classList.toggle('all-closed', allClosed);
+    if(row) {
+      row.classList.toggle('all-closed', allClosed);
+      row.classList.toggle('is-scoring', isScoring);
+    }
   });
 
   // Target

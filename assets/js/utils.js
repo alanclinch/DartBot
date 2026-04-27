@@ -141,7 +141,7 @@ function _doSpeak() {
   _isSpeaking = true;
   const utt = new SpeechSynthesisUtterance(_speechQueue.shift());
   if (_callerVoice) utt.voice = _callerVoice;
-  utt.rate = 1.84; utt.pitch = 1.0; utt.volume = 1.0;
+  utt.rate = 1.25; utt.pitch = 1.0; utt.volume = 1.0;
   utt.onend = utt.onerror = () => { _isSpeaking = false; _doSpeak(); };
   window.speechSynthesis.speak(utt);
 }

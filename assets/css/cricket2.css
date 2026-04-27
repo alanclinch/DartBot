@@ -351,8 +351,11 @@ body{
   color:var(--text);
 }
 .sb-num-cell.num-closed-all{color:var(--red);text-decoration:line-through;}
+.sb-num-cell.num-scoring{color:var(--green);}
 .sb-row.all-closed{background:rgba(160,20,20,.15);}
+.sb-row.is-scoring{background:rgba(52,211,153,.12);}
 .sb-row.all-closed .sb-num-cell{color:var(--red);}
+.sb-row.is-scoring .sb-num-cell{color:var(--green);}
 
 .sb-mark-cell{
   display:flex;align-items:center;justify-content:center;
