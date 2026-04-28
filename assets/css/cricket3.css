@@ -1,15 +1,15 @@
 *{box-sizing:border-box;margin:0;padding:0;}
 :root{
-  --bg:#05080f;
-  --bg2:#090e1a;
-  --surface:#0d1525;
-  --surface2:#162238;
-  --border:#20304c;
-  --border2:#2b4066;
+  --bg:#0e1e38;
+  --bg2:#122540;
+  --surface:#1a3052;
+  --surface2:#1f3a62;
+  --border:#2c4d72;
+  --border2:#3a618e;
   --gold:#fcd34d;
   --gold-dim:#b45309;
-  --text:#f8fafc;
-  --muted:#94a3b8;
+  --text:#eef4ff;
+  --muted:#a0b8d0;
   --green:#34d399;
   --green2:#059669;
   --green3:#022c20;
@@ -24,8 +24,8 @@
 body{
   background:var(--bg);
   background-image:
-    radial-gradient(ellipse at 15% 10%, rgba(30,60,180,.12) 0%, transparent 50%),
-    radial-gradient(ellipse at 85% 90%, rgba(10,30,120,.10) 0%, transparent 50%);
+    radial-gradient(ellipse at 15% 10%, rgba(40,100,220,.22) 0%, transparent 50%),
+    radial-gradient(ellipse at 85% 90%, rgba(20,70,180,.18) 0%, transparent 50%);
   color:var(--text);
   font-family:'Exo 2',sans-serif;
   height:100vh;
@@ -203,7 +203,7 @@ body{
   cursor:pointer;transition:all .2s;
 }
 .win-btn:hover{border-color:var(--blue);color:var(--blue);}
-.win-btn-primary{background:linear-gradient(135deg,#1a4580,#0d2450);border-color:var(--blue);color:var(--white);}
+.win-btn-primary{background:linear-gradient(135deg,#1e5090,#0f2e60);border-color:var(--blue);color:var(--white);}
 .win-btn-primary:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(96,165,250,.35);}
 .win-btn-danger:hover{border-color:var(--red);color:var(--red);}
 .cpu-modal-cancel{
@@ -254,17 +254,17 @@ body{
 .start-btn{
   width:100%;max-width:760px;
   padding:20px;
-  background:linear-gradient(135deg,#1a4580,#0d2450);
+  background:linear-gradient(135deg,#1e5090,#0f2e60);
   border:2px solid var(--blue);
   border-radius:14px;
   color:var(--white);
   font-family:'Orbitron',monospace;
   font-size:22px;letter-spacing:6px;font-weight:700;
   cursor:pointer;
-  box-shadow:0 6px 0 #060f20,0 12px 32px rgba(96,165,250,.25);
+  box-shadow:0 6px 0 #09152a,0 12px 32px rgba(96,165,250,.3);
   transition:all .2s;flex-shrink:0;
 }
-.start-btn:hover{transform:translateY(-3px);box-shadow:0 9px 0 #060f20,0 16px 42px rgba(96,165,250,.35);}
+.start-btn:hover{transform:translateY(-3px);box-shadow:0 9px 0 #09152a,0 16px 42px rgba(96,165,250,.4);}
 .start-btn:disabled{opacity:.35;cursor:not-allowed;transform:none;box-shadow:none;}
 
 /* ===================== GAME SCREEN ===================== */
@@ -383,7 +383,7 @@ body{
 }
 .sb-mark-cell.just-hit{animation:cellFlash .5s ease-out;}
 @keyframes cellFlash{
-  0%{background:rgba(96,165,250,.35);}
+  0%{background:rgba(200,230,255,.5);}
   100%{background:var(--surface);}
 }
 .sb-mark-cell.just-scored{animation:cellScore .5s ease-out;}
