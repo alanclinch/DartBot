@@ -104,7 +104,7 @@ body{
   padding:10px 16px;
 }
 .flag-wrap { width:42px; height:28px; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
-.sb-flag-wrap { width:64px; height:42px; display:flex; align-items:center; justify-content:center; }
+.sb-flag-wrap { width:32px; height:22px; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
 
 .player-row-name{
   font-size:20px;font-weight:700;color:var(--text);flex:1;
@@ -302,7 +302,7 @@ body{
   gap:8px;
 }
 .sb-hdr-row1 {
-  display:flex; align-items:center; justify-content:center; gap:12px; width:100%;
+  display:flex; align-items:center; justify-content:center; gap:8px; width:100%;
 }
 .sb-hdr-row2 {
   display:flex; align-items:baseline; justify-content:center; gap:16px; width:100%;

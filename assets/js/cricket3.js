@@ -417,7 +417,7 @@ function buildScoreboard(){
   // FIX: removed duplicate const declaration; correct sizes only
   const scoreFontSize = n <= 2 ? '72px' : n === 3 ? '60px' : '48px';
   const mprFontSize = n <= 2 ? '22px' : '18px';
-  const nameFontSize = n <= 2 ? '28px' : '22px';
+  const nameFontSize = n <= 2 ? '34px' : '26px';
   const numFontSize = n <= 2 ? '56px' : '48px';
 
   const top = document.getElementById('sb-top');
@@ -429,8 +429,8 @@ function buildScoreboard(){
     hdrHTML += `<div class="sb-player-hdr" id="phdr-${i}">
       <div class="sb-active-dot"></div>
       <div class="sb-hdr-row1">
-        <div class="sb-flag-wrap">${renderFlag(p.flag)}</div>
         <div class="sb-pname" title="${escapeHTML(p.name)}" style="font-size:${nameFontSize}">${escapeHTML(p.name)}</div>
+        <div class="sb-flag-wrap">${renderFlag(p.flag)}</div>
       </div>
       <div class="sb-hdr-row2">
         <div class="sb-score-big" id="pscore-${i}" style="font-size:${scoreFontSize}">0</div>
