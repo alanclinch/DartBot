@@ -428,14 +428,10 @@ function buildScoreboard(){
   players.forEach((p,i) => {
     hdrHTML += `<div class="sb-player-hdr" id="phdr-${i}">
       <div class="sb-active-dot"></div>
-      <div class="sb-hdr-row1">
-        <div class="sb-pname" title="${escapeHTML(p.name)}" style="font-size:${nameFontSize}">${escapeHTML(p.name)}</div>
-        <div class="sb-flag-wrap">${renderFlag(p.flag)}</div>
-      </div>
-      <div class="sb-hdr-row2">
-        <div class="sb-score-big" id="pscore-${i}" style="font-size:${scoreFontSize}">0</div>
-        <div class="sb-mpr" id="pmpr-${i}" style="font-size:${mprFontSize}">MPR 0.00</div>
-      </div>
+      <div class="sb-flag-corner">${renderFlag(p.flag)}</div>
+      <div class="sb-pname" title="${escapeHTML(p.name)}" style="font-size:${nameFontSize}">${escapeHTML(p.name)}</div>
+      <div class="sb-score-big" id="pscore-${i}" style="font-size:${scoreFontSize}">0</div>
+      <div class="sb-mpr" id="pmpr-${i}" style="font-size:${mprFontSize}">MPR —</div>
       ${p.isCpu ? `<div class="cpu-tag">CPU</div>` : ''}
     </div>`;
   });
