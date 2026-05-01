@@ -450,11 +450,16 @@ function launchLeg(){
   buildScoreboard();
   showScreen('game');
   enterFullscreen();
-  setTimeout(() => { updateScoreboard(); startTurn(); }, 100);
+  setTimeout(() => {
+    updateScoreboard();
+    speak(`${playerCallName(players[currentPlayer])}, you're up first`);
+    startTurn();
+  }, 100);
 }
 
 function nextLeg(){
   if(players.length < 2) return;
+  stopWinMusic();
   legNumber++;
   startingPlayer = (startingPlayer + 1) % players.length;
   launchLeg();
@@ -462,6 +467,7 @@ function nextLeg(){
 
 function goToMenu(){
   gameActive = false;
+  stopWinMusic();
   exitFullscreen();
   document.getElementById('confetti').innerHTML = '';
   window.location.href = '../index.html';
@@ -939,11 +945,138 @@ function checkWin(idx){
   return myScore >= highestScore;
 }
 
+// ── Win music: Chase the Sun (Planet Funk) — transcribed from piano roll ──
+// A minor, 128 BPM. Chord loop: a7sus4 → Cmaj7 → dm9 → Fmaj7 (2 bars each)
+// Melody from piano roll: E5 D5 C5 | B4 B4 | G4 G4 | A4 … E4
+let _winActive = false, _winGain = null, _winTimer = null;
+
+function playWinMusic() {
+  stopWinMusic();
+  _winActive = true;
+  const ctx = gAC();
+  _winGain = ctx.createGain();
+  _winGain.gain.value = 0.5;
+  _winGain.connect(ctx.destination);
+  _winLoop(ctx);
+}
+
+function stopWinMusic() {
+  _winActive = false;
+  clearTimeout(_winTimer);
+  if (_winGain) {
+    const g = _winGain; _winGain = null;
+    try {
+      g.gain.setTargetAtTime(0, gAC().currentTime, 0.35);
+      setTimeout(() => { try { g.disconnect(); } catch(e){} }, 1400);
+    } catch(e) {}
+  }
+}
+
+function _winLoop(ctx) {
+  if (!_winActive || !_winGain) return;
+  const g = _winGain;
+  const t0 = ctx.currentTime + 0.04;
+  const q = 60 / 128, e = q / 2, h = q * 2;
+  const CL = 8 * q; // 2 bars per chord
+
+  // Four chords, each with bass root, soft pad, and melody notes
+  // mel entries: { t: offset_from_chord_start, f: freq, d: duration }
+  const chords = [
+    { // a7sus4 — melody: E5 D5 C5 descending
+      bass: 110,
+      pad:  [220, 329.63, 392],
+      mel:  [
+        { t: 0,       f: 659.25, d: q     },  // E5
+        { t: q,       f: 587.33, d: q+e   },  // D5
+        { t: q*2.5,   f: 523.25, d: e     },  // C5
+      ],
+    },
+    { // Cmaj7 — melody: B4 (short) then B4 (held)
+      bass: 130.81,
+      pad:  [261.63, 392, 493.88],
+      mel:  [
+        { t: e,       f: 493.88, d: e     },  // B4 short
+        { t: q*1.5,   f: 493.88, d: q+e   },  // B4 held
+      ],
+    },
+    { // dm9 — melody: two punchy G4 hits
+      bass: 146.83,
+      pad:  [293.66, 349.23, 440],
+      mel:  [
+        { t: 0,       f: 392,    d: e     },  // G4
+        { t: e*1.5,   f: 392,    d: e     },  // G4
+      ],
+    },
+    { // Fmaj7 — melody: A4 held, then E4 near end
+      bass: 174.61,
+      pad:  [349.23, 440, 523.25],
+      mel:  [
+        { t: 0,       f: 440,    d: h     },  // A4
+        { t: q*5.5,   f: 329.63, d: q     },  // E4
+      ],
+    },
+  ];
+
+  const totalTime = chords.length * CL;
+
+  chords.forEach((ch, ci) => {
+    const ct = t0 + ci * CL;
+    for (let b = 0; b < 8; b++) _winBass(ctx, g, ch.bass, ct + b * q, q * 0.5);
+    ch.pad.forEach(f => _winPad(ctx, g, f, ct, CL * 0.97));
+    ch.mel.forEach(({ t, f, d }) => _winSynth(ctx, g, f, ct + t, d * 0.82));
+  });
+
+  _winTimer = setTimeout(() => _winLoop(ctx), (totalTime - 0.06) * 1000);
+}
+
+function _winSynth(ctx, g, freq, start, dur) {
+  const osc = ctx.createOscillator();
+  const filt = ctx.createBiquadFilter();
+  const env = ctx.createGain();
+  osc.type = 'sawtooth';
+  osc.frequency.value = freq;
+  filt.type = 'lowpass';
+  filt.frequency.setValueAtTime(2200, start);
+  filt.frequency.linearRampToValueAtTime(900, start + dur);
+  filt.Q.value = 4;
+  env.gain.setValueAtTime(0, start);
+  env.gain.linearRampToValueAtTime(0.55, start + 0.012);
+  env.gain.setValueAtTime(0.45, start + Math.max(0, dur - 0.04));
+  env.gain.linearRampToValueAtTime(0, start + dur);
+  osc.connect(filt); filt.connect(env); env.connect(g);
+  osc.start(start); osc.stop(start + dur + 0.05);
+}
+
+function _winBass(ctx, g, freq, start, dur) {
+  const osc = ctx.createOscillator();
+  const env = ctx.createGain();
+  osc.type = 'sine';
+  osc.frequency.value = freq;
+  env.gain.setValueAtTime(0.45, start);
+  env.gain.exponentialRampToValueAtTime(0.001, start + dur);
+  osc.connect(env); env.connect(g);
+  osc.start(start); osc.stop(start + dur + 0.05);
+}
+
+function _winPad(ctx, g, freq, start, dur) {
+  const osc = ctx.createOscillator();
+  const env = ctx.createGain();
+  osc.type = 'triangle';
+  osc.frequency.value = freq;
+  env.gain.setValueAtTime(0, start);
+  env.gain.linearRampToValueAtTime(0.07, start + 0.2);
+  env.gain.setValueAtTime(0.07, start + dur - 0.15);
+  env.gain.linearRampToValueAtTime(0, start + dur);
+  osc.connect(env); env.connect(g);
+  osc.start(start); osc.stop(start + dur + 0.05);
+}
+
 async function endWithWinner(idx){
   gameActive = false;
   const winner = players[idx];
   sfxCheckout();
   speak(`${playerCallName(winner)} wins!`, true);
+  setTimeout(() => playWinMusic(), 1800);
   const mprOf = p => p.dartsThrown >= 3
     ? (p.marksThrown / (p.dartsThrown / 3)).toFixed(2)
     : '0.00';
@@ -974,6 +1107,7 @@ async function endWithWinner(idx){
 
 function endGame(){
   gameActive = false;
+  stopWinMusic();
   flushThrowsToNeon();
   exitFullscreen();
   document.getElementById('confetti').innerHTML = '';

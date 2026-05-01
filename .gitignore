@@ -1,6 +1,9 @@
 # Documentation — kept local, not uploaded to GitHub
 Documentation/
 
+# Audio files — kept local due to copyright, not pushed to GitHub
+assets/audio/
+
 # OS files
 .DS_Store
 Thumbs.db

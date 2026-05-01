@@ -266,13 +266,13 @@ body{
 .start-btn:disabled{opacity:.35;cursor:not-allowed;transform:none;box-shadow:none;}
 .stats-btn{
   width:100%;max-width:760px;
-  padding:12px;
-  background:transparent;
-  border:1px solid var(--border2);
+  padding:16px;
+  background:none;
+  border:2px dashed var(--border2);
   border-radius:10px;
   color:var(--muted);
   font-family:'Exo 2',sans-serif;
-  font-size:14px;letter-spacing:2px;font-weight:600;
+  font-size:18px;letter-spacing:1px;font-weight:700;
   cursor:pointer;
   transition:all .2s;
 }
