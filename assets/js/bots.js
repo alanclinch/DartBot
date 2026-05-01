@@ -121,9 +121,9 @@ function generateCpuThrow(target, mpr, opts) {
   let baseSigma = 46 - (6.5 * mpr);
 
   // Simulate "early game confidence" vs "late game pressure/fatigue".
-  // Darts 0-10: Starts significantly hotter (~35% tighter variance).
+  // Darts 0-10: Starts slightly hotter (~15% tighter variance).
   // Darts 30+: Settles into their true baseline target MPR.
-  const focusMultiplier = 0.65 + (Math.min(dartsThrown, 30) / 30) * 0.35;
+  const focusMultiplier = 0.85 + (Math.min(dartsThrown, 30) / 30) * 0.15;
   baseSigma *= focusMultiplier;
 
   baseSigma = Math.max(5, Math.min(65, baseSigma));
@@ -131,8 +131,8 @@ function generateCpuThrow(target, mpr, opts) {
   // Apply roundForm (higher form = better throw = tighter variance)
   let currentSigma = baseSigma / roundForm;
 
-  // Miss streak recovery: tighten focus by up to 15% after missing
-  currentSigma *= Math.max(0.85, 1 - (missStreak * 0.05));
+  // Miss streak recovery: tighten focus by up to 30% after sustained misses
+  currentSigma *= Math.max(0.70, 1 - (missStreak * 0.06));
 
   // Occasional random wild dart (yips / slip) ~3% chance
   if (Math.random() < 0.03) {

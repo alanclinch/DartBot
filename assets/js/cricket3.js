@@ -641,7 +641,8 @@ function registerDart(seg, coords = null){
 
     p.marks[num] = Math.min(3, currentMarks + marks);
     const scoringMarks = (marksToScore > 0 && !othersAllClosed && gameVariant !== 'noscore') ? marksToScore : 0;
-    p.marksThrown += marksToClose + scoringMarks;
+    // MPR rule: treble=3, double=2, single=1, but 0 if current player already closed this number
+    p.marksThrown += (currentMarks >= 3) ? 0 : marks;
 
     if(marksToScore > 0 && !othersAllClosed && gameVariant !== 'noscore'){
       if(gameVariant === 'standard'){
