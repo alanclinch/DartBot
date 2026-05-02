@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pokémon Darts — Autodarts</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎮</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/game.css?v=2">
+<script src="../assets/js/autodarts.js?v=2"></script>
+<script src="../assets/js/utils.js?v=2"></script>
+<script src="../assets/js/bots.js?v=2"></script>
+<link rel="stylesheet" href="../assets/css/pokemon.css?v=1">
+</head>
+<body>
+
+<!-- SETUP -->
+<div id="setup" class="screen active">
+  <div class="setup-title">POKÉMON DARTS 🎮</div>
+
+  <div class="setup-card">
+    <h3>Game Mode</h3>
+    <div class="variant-grid">
+      <button class="variant-btn sel" onclick="selectMode('wild',this)">Wild Encounter</button>
+      <button class="variant-btn" onclick="selectMode('gym',this)">Gym Battle</button>
+    </div>
+    <div class="variant-desc" id="variant-desc"></div>
+  </div>
+
+  <div class="setup-card">
+    <h3>Players <span style="color:var(--muted);font-size:12px;">(exactly 2)</span></h3>
+    <div id="player-list"></div>
+    <div class="add-btns">
+      <button class="add-btn add-human-btn" onclick="openHumanModal()">+ Human Player</button>
+      <button class="add-btn add-cpu-btn" onclick="openCpuModal()">+ Computer Player</button>
+    </div>
+    <div id="recent-players" class="recent-players"></div>
+  </div>
+
+  <button class="start-btn" id="start-btn" onclick="startGame()" disabled>START GAME</button>
+  <button class="stats-btn" onclick="showStatsModal()">📊 Stats</button>
+</div>
+
+<!-- CPU MODAL -->
+<div id="cpu-modal" class="modal-overlay">
+  <div class="cpu-modal-box">
+    <h2>SELECT OPPONENT</h2>
+    <div class="cpu-grid" id="cpu-grid"></div>
+    <button class="cpu-modal-cancel" onclick="closeCpuModal()">Cancel</button>
+  </div>
+</div>
+
+<!-- HUMAN MODAL -->
+<div id="human-modal" class="modal-overlay">
+  <div class="cpu-modal-box" style="width:min(420px,96vw);">
+    <h2>ADD HUMAN PLAYER</h2>
+    <input type="text" id="new-human-name" class="modal-input" placeholder="Enter Name" maxlength="14">
+    <select id="new-human-flag" class="modal-input" style="cursor:pointer;">
+      <option value="sco" selected>Scotland</option>
+      <option value="eng">England</option>
+      <option value="wal">Wales</option>
+      <option value="ned">Netherlands</option>
+    </select>
+    <div style="display:flex;gap:14px;margin-top:10px;">
+      <button class="win-btn win-btn-primary" onclick="confirmAddHuman()">ADD PLAYER</button>
+      <button class="win-btn" onclick="closeHumanModal()">CANCEL</button>
+    </div>
+  </div>
+</div>
+
+<!-- DRAFT SCREEN -->
+<div id="draft" class="screen">
+  <div class="draft-title">DRAFT PHASE</div>
+  <div class="draft-instruction" id="draft-instruction">Throw to pick your Pokémon!</div>
+  <div class="draft-grid" id="draft-grid"></div>
+
+  <div style="width:100%;max-width:520px;margin-top:8px;">
+    <div class="keypad-wrap">
+      <div class="keypad-row">
+        <button class="kp-btn" onclick="manualDraft(1)">1</button>
+        <button class="kp-btn" onclick="manualDraft(2)">2</button>
+        <button class="kp-btn" onclick="manualDraft(3)">3</button>
+        <button class="kp-btn" onclick="manualDraft(4)">4</button>
+        <button class="kp-btn" onclick="manualDraft(5)">5</button>
+      </div>
+      <div class="keypad-row">
+        <button class="kp-btn" onclick="manualDraft(6)">6</button>
+        <button class="kp-btn" onclick="manualDraft(7)">7</button>
+        <button class="kp-btn" onclick="manualDraft(8)">8</button>
+        <button class="kp-btn" onclick="manualDraft(9)">9</button>
+        <button class="kp-btn" onclick="manualDraft(10)">10</button>
+      </div>
+      <div class="keypad-row">
+        <button class="kp-btn" onclick="manualDraft(11)">11</button>
+        <button class="kp-btn" onclick="manualDraft(12)">12</button>
+        <button class="kp-btn" onclick="manualDraft(13)">13</button>
+        <button class="kp-btn" onclick="manualDraft(14)">14</button>
+        <button class="kp-btn" onclick="manualDraft(15)">15</button>
+      </div>
+      <div class="keypad-row">
+        <button class="kp-btn" onclick="manualDraft(16)">16</button>
+        <button class="kp-btn" onclick="manualDraft(17)">17</button>
+        <button class="kp-btn" onclick="manualDraft(18)">18</button>
+        <button class="kp-btn" onclick="manualDraft(19)">19</button>
+        <button class="kp-btn" onclick="manualDraft(20)">20</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- VS SCREEN -->
+<div id="vs-screen" class="screen">
+  <div class="vs-layout">
+    <div class="vs-pokemon" id="vs-p1"></div>
+    <div class="vs-text">VS</div>
+    <div class="vs-pokemon" id="vs-p2"></div>
+  </div>
+  <div class="vs-goes-first" id="vs-goes-first"></div>
+</div>
+
+<!-- GAME SCREEN -->
+<div id="game" class="screen">
+  <div class="battle-area">
+    <div class="battle-field">
+
+      <!-- Player 0 side -->
+      <div class="poke-side" id="poke-side-0">
+        <div class="poke-player-tag">PLAYER 1</div>
+        <div class="poke-hp-bar-wrap">
+          <div class="poke-hp-label">
+            <span>HP</span>
+            <span class="poke-hp-val" id="hp-val-0">— / — HP</span>
+          </div>
+          <div class="poke-hp-track">
+            <div class="poke-hp-fill" id="hp-fill-0" style="width:100%"></div>
+          </div>
+        </div>
+        <div class="poke-sprite-wrap">
+          <img class="poke-sprite" id="sprite-0" src="" alt="Pokemon 1">
+          <div class="poke-status-badge" id="status-badge-0"></div>
+          <div class="poke-evolved-badge" id="evolved-badge-0"></div>
+        </div>
+        <div class="poke-name-tag">—</div>
+        <div class="poke-evolved-name"></div>
+        <div class="passive-tag"></div>
+      </div>
+
+      <!-- Divider -->
+      <div class="battle-divider">
+        <div class="battle-vs-text">VS</div>
+        <div class="battle-round-box">
+          <div class="battle-round-num" id="battle-round-num">1</div>
+          <div class="battle-round-label">ROUND</div>
+        </div>
+      </div>
+
+      <!-- Player 1 side -->
+      <div class="poke-side" id="poke-side-1">
+        <div class="poke-player-tag">PLAYER 2</div>
+        <div class="poke-hp-bar-wrap">
+          <div class="poke-hp-label">
+            <span>HP</span>
+            <span class="poke-hp-val" id="hp-val-1">— / — HP</span>
+          </div>
+          <div class="poke-hp-track">
+            <div class="poke-hp-fill" id="hp-fill-1" style="width:100%"></div>
+          </div>
+        </div>
+        <div class="poke-sprite-wrap">
+          <img class="poke-sprite p2-sprite" id="sprite-1" src="" alt="Pokemon 2">
+          <div class="poke-status-badge" id="status-badge-1"></div>
+          <div class="poke-evolved-badge" id="evolved-badge-1"></div>
+        </div>
+        <div class="poke-name-tag">—</div>
+        <div class="poke-evolved-name"></div>
+        <div class="passive-tag"></div>
+      </div>
+    </div>
+
+    <!-- Action zone -->
+    <div class="action-zone">
+      <div class="action-main" id="action-main">AIM FOR TREBLES</div>
+      <div class="action-sub" id="action-sub">Throw your darts</div>
+    </div>
+  </div>
+
+  <!-- Side panel -->
+  <div id="poke-panel">
+    <div>
+      <div class="panel-label">Current Turn</div>
+      <div class="turn-info">
+        <div class="turn-player" id="turn-player-name">—</div>
+        <div class="turn-sub" id="turn-sub">Throw your darts</div>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel-label">Darts</div>
+      <div class="dart-slots" id="dart-slots">
+        <div class="dart-slot" id="ds0"><div class="dart-slot-label">1ST</div><div class="dart-slot-val">—</div></div>
+        <div class="dart-slot" id="ds1"><div class="dart-slot-label">2ND</div><div class="dart-slot-val">—</div></div>
+        <div class="dart-slot" id="ds2"><div class="dart-slot-label">3RD</div><div class="dart-slot-val">—</div></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel-label">Manual Input</div>
+      <div class="keypad-wrap">
+        <div class="keypad-row">
+          <button class="kp-btn" onclick="manualDart(20)">20</button>
+          <button class="kp-btn" onclick="manualDart(19)">19</button>
+          <button class="kp-btn" onclick="manualDart(18)">18</button>
+          <button class="kp-btn" onclick="manualDart(17)">17</button>
+          <button class="kp-btn" onclick="manualDart(16)">16</button>
+        </div>
+        <div class="keypad-row">
+          <button class="kp-btn" onclick="manualDart(15)">15</button>
+          <button class="kp-btn" onclick="manualDart(14)">14</button>
+          <button class="kp-btn" onclick="manualDart(13)">13</button>
+          <button class="kp-btn" onclick="manualDart(12)">12</button>
+          <button class="kp-btn" onclick="manualDart(11)">11</button>
+        </div>
+        <div class="keypad-row">
+          <button class="kp-btn" onclick="manualDart(10)">10</button>
+          <button class="kp-btn" onclick="manualDart(9)">9</button>
+          <button class="kp-btn" onclick="manualDart(8)">8</button>
+          <button class="kp-btn" onclick="manualDart(7)">7</button>
+          <button class="kp-btn" onclick="manualDart(6)">6</button>
+        </div>
+        <div class="keypad-row">
+          <button class="kp-btn" onclick="manualDart(5)">5</button>
+          <button class="kp-btn" onclick="manualDart(4)">4</button>
+          <button class="kp-btn" onclick="manualDart(3)">3</button>
+          <button class="kp-btn" onclick="manualDart(2)">2</button>
+          <button class="kp-btn" onclick="manualDart(1)">1</button>
+        </div>
+        <div class="keypad-row">
+          <button class="kp-btn" onclick="manualDart(25)" style="flex:2;">BULL</button>
+          <button class="kp-btn" onclick="keypadMod=2;manualDart(25)" style="flex:2;border-color:var(--amber);color:var(--amber);">D-BULL</button>
+          <button class="kp-btn kp-miss" onclick="manualDart(0)">MISS</button>
+        </div>
+        <div class="keypad-row">
+          <button class="kp-btn kp-mod" id="mod-double" onclick="toggleKeypadMod(2)">DOUBLE</button>
+          <button class="kp-btn kp-mod" id="mod-treble" onclick="toggleKeypadMod(3)">TREBLE</button>
+          <button class="kp-btn kp-undo" onclick="undoLastDart()">UNDO</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="game-ws">
+      <div class="ws-dot" id="game-ws-dot"></div>
+      <div class="ws-label" id="game-ws-label">Not Connected</div>
+    </div>
+
+    <button class="end-btn" id="next-player-btn" onclick="advanceTurn()" style="display:none;border-color:var(--green);color:var(--green);">NEXT PLAYER →</button>
+    <button class="end-btn" onclick="showLog()" style="border-color:var(--amber);color:var(--amber);">Show Throw Log</button>
+    <button class="end-btn" onclick="endGame()">End Game</button>
+  </div>
+</div>
+
+<!-- WINNER SCREEN -->
+<div id="winner" class="screen">
+  <div class="winner-layout">
+    <div class="win-card" style="width:100%;">
+      <div class="win-trophy">🏆</div>
+      <div class="win-label">WINNER</div>
+      <div class="win-name" id="win-name">—</div>
+      <div class="win-score" id="win-details">—</div>
+    </div>
+    <div id="win-others"></div>
+
+    <div class="setup-card" style="width:100%;margin-top:4px;">
+      <h3>Next Match Roster</h3>
+      <div id="player-list-winner"></div>
+      <div class="add-btns">
+        <button class="add-btn add-human-btn" onclick="openHumanModal()">+ Human Player</button>
+        <button class="add-btn add-cpu-btn" onclick="openCpuModal()">+ Computer Player</button>
+      </div>
+      <div id="recent-players-winner" class="recent-players"></div>
+    </div>
+
+    <div class="win-buttons">
+      <button class="win-btn win-btn-primary" id="next-leg-btn" onclick="nextLeg()" style="font-size:18px;padding:20px;">PLAY NEXT LEG</button>
+      <button class="win-btn win-btn-danger" onclick="goToMenu()">MENU</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOG MODAL -->
+<div id="log-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:999;align-items:center;justify-content:center;flex-direction:column;padding:20px;backdrop-filter:blur(4px);">
+  <h2 style="color:var(--blue);font-family:'Orbitron',monospace;margin-bottom:16px;">Raw Throw Log</h2>
+  <textarea id="log-output" style="width:min(800px,90%);height:60vh;background:var(--bg2);color:var(--green);font-family:'Share Tech Mono',monospace;padding:16px;border:2px solid var(--border2);border-radius:12px;outline:none;resize:none;"></textarea>
+  <div style="display:flex;gap:14px;margin-top:20px;">
+    <button class="win-btn win-btn-primary" onclick="copyLog()">Copy to Clipboard</button>
+    <button class="win-btn" onclick="closeLog()">Close</button>
+  </div>
+</div>
+
+<!-- STATS MODAL -->
+<div id="stats-modal" class="modal-overlay" style="display:none;">
+  <div class="stats-modal-box">
+    <h2>PLAYER STATS</h2>
+    <div id="stats-content"></div>
+    <div style="display:flex;gap:12px;margin-top:20px;justify-content:center;">
+      <button class="win-btn" onclick="closeStatsModal()">CLOSE</button>
+    </div>
+  </div>
+</div>
+
+<div id="confetti"></div>
+<div id="announce"></div>
+<script src="../assets/js/pokemon.js?v=1"></script>
+</body>
+</html>
