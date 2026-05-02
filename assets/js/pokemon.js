@@ -545,6 +545,7 @@ function startTurn() {
   if (subEl) subEl.textContent = p.isCpu ? 'Computer thinking...' : 'Throw your darts';
 
   updateBattleField();
+  updateScoringGuide();
   if (p.isCpu) setTimeout(() => runCpuTurn(), 2000);
 }
 
@@ -564,6 +565,8 @@ function advanceTurn() {
   currentPlayer = next;
 
   updateBattleField();
+  const guide = document.getElementById('scoring-guide');
+  if (guide) guide.classList.remove('visible');
   setTimeout(() => {
     const callName = players[currentPlayer].isCpu ? players[currentPlayer].name.split(' ')[0] : players[currentPlayer].name;
     speak(callName);
@@ -989,6 +992,84 @@ function setActionZone(main, sub) {
   const subEl  = document.getElementById('action-sub');
   if (mainEl) mainEl.textContent = main;
   if (subEl)  subEl.textContent  = sub;
+}
+
+function updateScoringGuide() {
+  const guide = document.getElementById('scoring-guide');
+  const grid  = document.getElementById('sg-grid');
+  const passiveEl = document.getElementById('sg-passive');
+  if (!guide || !grid) return;
+
+  const p = players[currentPlayer];
+  if (!p || p.isCpu || !gameActive || !p.pokemon) {
+    guide.classList.remove('visible');
+    return;
+  }
+  guide.classList.add('visible');
+
+  const cls    = p.pokemon.cls;
+  const isWild = gameMode === 'wild';
+  const boost  = p.dmgBoost + xAttackBonus;
+  const bStr   = boost > 0 ? ` +${boost}` : '';
+  const isSni  = cls === 'Sniper';
+  const isTank = cls === 'Tank';
+  const isBraw = cls === 'Brawler';
+  const isStat = cls === 'Status';
+
+  const rows = [
+    {
+      type: 'SINGLE ODD',
+      value: isWild ? `${10+boost}–${20+boost}` : `FACE VAL${bStr}${isBraw?' +10':''}`,
+      label: 'DAMAGE' + (isBraw ? ' (+10 BONUS)' : ''),
+      valCls: 'dmg', itemCls: 'sg-dmg',
+    },
+    {
+      type: 'SINGLE EVEN',
+      value: isWild ? `${10+(isTank?10:0)}–${20+(isTank?10:0)}` : `FACE VAL${isTank?' +10':''}`,
+      label: 'HEAL' + (isTank ? ' (+10 BONUS)' : ''),
+      valCls: 'heal', itemCls: 'sg-heal',
+    },
+    {
+      type: 'DOUBLE',
+      value: isWild ? `${25+boost}–${40+boost}` : `FACE ×2${bStr}`,
+      label: 'DAMAGE',
+      valCls: 'dmg', itemCls: 'sg-dmg',
+    },
+    {
+      type: 'TREBLE',
+      value: isWild
+        ? `${(isSni?52:45)+boost}–${(isSni?70:60)+boost}`
+        : `FACE ×${isSni?'3.5':'3'}${bStr}`,
+      label: 'DAMAGE' + (isSni ? ' (SNIPER ×3.5)' : ''),
+      valCls: 'dmg', itemCls: 'sg-dmg',
+    },
+    {
+      type: 'BULL',
+      value: isWild ? 'ITEM' : `25${bStr}`,
+      label: isWild
+        ? 'RANDOM ITEM' + (isStat ? ' + DART STEAL' : '')
+        : 'DMG + ITEM' + (isStat ? ' + DART STEAL' : ''),
+      valCls: isWild ? 'amber' : 'dmg',
+      itemCls: isWild ? 'sg-item-type' : 'sg-dmg',
+    },
+    {
+      type: 'BULLSEYE',
+      value: `${80+boost}`,
+      label: 'CRIT + MEGA EVO' + (isStat ? ' + STATUS' : ''),
+      valCls: 'gold', itemCls: 'sg-mega',
+    },
+  ];
+
+  grid.innerHTML = rows.map(it => `
+    <div class="sg-item ${it.itemCls}">
+      <div class="sg-type">${it.type}</div>
+      <div class="sg-value ${it.valCls}">${it.value}</div>
+      <div class="sg-label ${it.valCls}">${it.label}</div>
+    </div>`).join('');
+
+  if (passiveEl) {
+    passiveEl.textContent = `${cls} Passive — ${CLASS_PASSIVES[cls]}${boost > 0 ? `  ·  Current DMG Boost: +${boost}` : ''}`;
+  }
 }
 
 function getTargetSuggestion(p) {

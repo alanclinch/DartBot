@@ -597,3 +597,84 @@ body{
 .stats-table td{padding:10px;border-bottom:1px solid rgba(44,77,114,.4);color:var(--text);vertical-align:middle;}
 .stats-table tbody tr:hover td{background:rgba(96,165,250,.05);}
 .stats-empty{color:var(--muted);opacity:.6;text-align:center;padding:32px 0;font-size:14px;}
+
+/* ===================== SCORING GUIDE ===================== */
+.scoring-guide{
+  display:none;
+  flex-direction:column;
+  gap:10px;
+  background:var(--surface);
+  border:2px solid var(--border2);
+  border-radius:14px;
+  padding:14px 18px;
+  flex-shrink:0;
+}
+.scoring-guide.visible{display:flex;}
+
+.sg-header{
+  font-family:'Orbitron',monospace;
+  font-size:11px;letter-spacing:4px;
+  color:var(--muted);
+  text-align:center;
+  text-transform:uppercase;
+}
+
+.sg-grid{
+  display:grid;
+  grid-template-columns:repeat(6,1fr);
+  gap:10px;
+}
+
+.sg-item{
+  background:var(--surface2);
+  border:2px solid var(--border);
+  border-radius:10px;
+  padding:12px 8px;
+  text-align:center;
+  display:flex;flex-direction:column;
+  align-items:center;gap:5px;
+  transition:border-color .2s;
+}
+.sg-item.sg-dmg{border-color:rgba(230,57,70,.4);}
+.sg-item.sg-heal{border-color:rgba(69,203,133,.4);}
+.sg-item.sg-item-type{border-color:rgba(251,191,36,.4);}
+.sg-item.sg-mega{border-color:rgba(252,211,77,.5);}
+
+.sg-type{
+  font-size:11px;letter-spacing:2px;
+  color:var(--muted);
+  font-family:'Share Tech Mono',monospace;
+  text-transform:uppercase;
+}
+
+.sg-value{
+  font-family:'Orbitron',monospace;
+  font-size:clamp(15px,1.4vw,20px);
+  font-weight:900;
+  line-height:1.1;
+}
+.sg-value.dmg{color:var(--poke-red);}
+.sg-value.heal{color:var(--hp-green);}
+.sg-value.amber{color:var(--amber);}
+.sg-value.gold{color:var(--gold);}
+
+.sg-label{
+  font-size:11px;
+  color:var(--muted);
+  letter-spacing:1px;
+  line-height:1.3;
+}
+.sg-label.dmg{color:rgba(230,57,70,.8);}
+.sg-label.heal{color:rgba(69,203,133,.8);}
+.sg-label.amber{color:var(--amber);}
+.sg-label.gold{color:var(--gold);}
+
+.sg-passive-bar{
+  text-align:center;
+  font-size:13px;letter-spacing:1px;
+  padding:8px 16px;
+  background:rgba(255,214,10,.07);
+  border:1px solid rgba(255,214,10,.2);
+  border-radius:8px;
+  color:var(--gold);
+}
