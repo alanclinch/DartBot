@@ -253,7 +253,7 @@ body{
   color:var(--poke-yellow);
   letter-spacing:6px;
 }
-.draft-instruction{font-size:16px;color:var(--muted);text-align:center;}
+.draft-instruction{font-size:18px;color:var(--text);font-weight:600;text-align:center;}
 .draft-grid{
   display:grid;
   grid-template-columns:repeat(5,1fr);
@@ -375,7 +375,7 @@ body{
   align-items:center;gap:10px;
   height:100%;justify-content:center;
 }
-.poke-player-tag{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:2px;}
+.poke-player-tag{font-size:13px;color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:2px;}
 .poke-name-tag{
   font-family:'Orbitron',monospace;
   font-size:clamp(14px,2vw,20px);font-weight:700;
@@ -405,8 +405,8 @@ body{
 
 .poke-sprite-wrap{position:relative;display:flex;align-items:center;justify-content:center;}
 .poke-sprite{
-  width:clamp(100px,16vw,180px);
-  height:clamp(100px,16vw,180px);
+  width:clamp(140px,20vw,230px);
+  height:clamp(140px,20vw,230px);
   image-rendering:pixelated;
   object-fit:contain;
   transition:filter .3s;
@@ -459,12 +459,23 @@ body{
   border-radius:12px;padding:14px 20px;text-align:center;
   min-height:64px;display:flex;align-items:center;justify-content:center;
   flex-direction:column;gap:4px;flex-shrink:0;
+  transition:border-color .3s, background .3s;
+}
+.action-zone.finish-mode{
+  border-color:var(--poke-yellow);
+  background:rgba(255,214,10,.08);
+  animation:finishPulse 1.2s ease-in-out infinite;
+}
+@keyframes finishPulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(255,214,10,.3);}
+  50%{box-shadow:0 0 20px 6px rgba(255,214,10,.2);}
 }
 .action-main{
-  font-family:'Orbitron',monospace;font-size:16px;font-weight:700;
-  color:var(--text);letter-spacing:2px;
+  font-family:'Orbitron',monospace;font-size:clamp(14px,1.8vw,20px);font-weight:700;
+  color:#fff;letter-spacing:2px;
+  text-shadow:0 0 20px rgba(255,255,255,.3);
 }
-.action-sub{font-size:13px;color:var(--muted);}
+.action-sub{font-size:13px;color:var(--text);}
 
 /* ===================== SIDE PANEL ===================== */
 #poke-panel{

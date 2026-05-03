@@ -1,5 +1,5 @@
 // CPU_PLAYERS, makeFaceSVG, humanAvatarSVG, generateCpuThrow — from bots.js
-// PLAYER_COLORS, showScreen, speak, sfxHit, sfxMiss, gAC, tone, noiz,
+// PLAYER_COLORS, showScreen, speak, sfxMiss, gAC, tone, noiz,
 // spawnConfetti, initSpeech — from utils.js
 
 // =============================================
@@ -58,6 +58,9 @@ let advancing = false;
 let legNumber = 0;
 let startingPlayer = 0;
 let keypadMod = 1;
+let finishMode = false;
+let finishTarget = 0;
+let finishTotal = 0;
 
 // =============================================
 // UTILITIES
@@ -321,6 +324,9 @@ function startGame() {
   if (players.length !== 2) return;
   legNumber = 0;
   startingPlayer = rand(0, 1);
+  if (document.documentElement.requestFullscreen) {
+    document.documentElement.requestFullscreen().catch(() => {});
+  }
   launchLeg();
 }
 
@@ -348,6 +354,9 @@ function launchLeg() {
   seenThrows = 0;
   turnEnded = false;
   currentDarts = [];
+  finishMode = false;
+  finishTarget = 0;
+  finishTotal = 0;
 
   buildDraftGrid();
   showScreen('draft');
@@ -385,7 +394,11 @@ function buildDraftGrid() {
 function registerDraftThrow(seg) {
   if (!draftPhase) return;
   const num = seg ? Number(seg.number) : 0;
-  if (!num || num < 1 || num > 20) return;
+  if (!num || num < 1 || num > 20) {
+    sfxMiss();
+    flash('Miss! Try again.', 'var(--muted)');
+    return;
+  }
   const poke = draftMap[num];
   if (!poke) return;
 
@@ -456,6 +469,7 @@ function startBattle() {
   currentPlayer = startingPlayer;
   round = 1;
   xAttackBonus = 0;
+  seenThrows = 0;
 
   // Init HP
   players.forEach(p => {
@@ -538,15 +552,27 @@ function startTurn() {
     speak('A dart was stolen!');
   }
 
+  // Finish mode: opponent has ≤ 20 HP — must hit exactly
+  finishMode = false;
+  finishTotal = 0;
+  finishTarget = 0;
+  const oppForFinish = players[1 - currentPlayer];
+  if (oppForFinish.hp > 0 && oppForFinish.hp <= 20) {
+    finishMode = true;
+    finishTarget = oppForFinish.hp;
+    sfxFinishMode();
+    flash(`FINISH! Hit ${finishTarget} exactly!`, 'var(--poke-yellow)');
+  }
+
   resetDartSlots();
   const nameEl = document.getElementById('turn-player-name');
   if (nameEl) { nameEl.textContent = p.name; nameEl.classList.toggle('cpu-turn', p.isCpu); }
   const subEl = document.getElementById('turn-sub');
-  if (subEl) subEl.textContent = p.isCpu ? 'Computer thinking...' : 'Throw your darts';
+  if (subEl) subEl.textContent = p.isCpu ? 'Computer thinking...' : (finishMode ? `Hit ${finishTarget} EXACTLY` : 'Throw your darts');
 
   updateBattleField();
   updateScoringGuide();
-  if (p.isCpu) setTimeout(() => runCpuTurn(), 2000);
+  if (p.isCpu) setTimeout(() => runCpuTurn(), finishMode ? 1500 : 2000);
 }
 
 function advanceTurn() {
@@ -601,10 +627,73 @@ function registerDart(seg) {
 
   saveState();
   p.dartsThrown++;
-
   const dartIdx = currentDarts.length;
+
+  // ── FINISH MODE ──────────────────────────────────────
+  if (finishMode) {
+    const num = seg ? Number(seg.number) : 0;
+    const mul = seg ? Number(seg.multiplier || 1) : 0;
+
+    // Bull or Bullseye heals in finish mode
+    if (num === 25) {
+      const healAmt = mul === 2 ? 50 : 25;
+      p.hp = Math.min(p.maxHp, p.hp + healAmt);
+      p.totalHeal += healAmt;
+      sfxPokeHeal();
+      flash(`+${healAmt} HP (${mul === 2 ? 'Bullseye' : 'Bull'} Heal!)`, 'var(--hp-green)');
+      speak(`${healAmt} healed!`);
+      currentDarts.push({ label: `+${healAmt}HP`, type: 'heal', amount: healAmt, mul });
+      updateDartSlot(dartIdx, `+${healAmt}HP`, 'heal');
+      updateBattleField();
+    } else if (!num || num === 0) {
+      sfxMiss();
+      flash('Miss!', 'var(--muted)');
+      currentDarts.push({ label: 'Miss', type: 'miss', amount: 0, mul: 0 });
+      updateDartSlot(dartIdx, 'Miss', 'miss');
+    } else {
+      // Face value only — multiplier ignored
+      finishTotal += num;
+      if (finishTotal > finishTarget) {
+        // Bust
+        sfxBust();
+        flash('BUST! No finish!', 'var(--poke-red)');
+        speak('Bust!');
+        currentDarts.push({ label: 'BUST!', type: 'miss', amount: 0, mul });
+        updateDartSlot(dartIdx, 'BUST!', 'miss');
+        endFinishTurn();
+        return;
+      } else if (finishTotal === finishTarget) {
+        // Win!
+        players[1 - currentPlayer].hp = 0;
+        sfxPokeDamage();
+        flash(`FINISH! ${finishTarget} EXACTLY! 🎯`, 'var(--gold)');
+        speak('Finish!');
+        currentDarts.push({ label: `${num}✓`, type: 'crit', amount: num, mul });
+        updateDartSlot(dartIdx, `${num}✓`, 'scored');
+        updateBattleField();
+        turnEnded = true;
+        setTimeout(() => endWithWinner(currentPlayer), 800);
+        return;
+      } else {
+        sfxPokeDamage();
+        const rem = finishTarget - finishTotal;
+        flash(`${num} hit — need ${rem} more`, 'var(--amber)');
+        currentDarts.push({ label: `${num} (${finishTotal})`, type: 'hit', amount: num, mul });
+        updateDartSlot(dartIdx, `${num}`, 'hit');
+        updateBattleField();
+      }
+    }
+
+    if (currentDarts.length >= p._maxDartsThisTurn) {
+      flash('No finish this turn', 'var(--muted)');
+      endFinishTurn();
+    }
+    return;
+  }
+
+  // ── NORMAL MODE ──────────────────────────────────────
   const result = calcEffect(seg, p, players[1 - currentPlayer]);
-  applyEffect(result, currentPlayer);
+  const wasEndured = applyEffect(result, currentPlayer);
 
   const label = result.label || (result.type === 'miss' ? 'Miss' : String(result.amount));
   let slotClass = 'hit';
@@ -619,12 +708,27 @@ function registerDart(seg) {
   if (checkWin()) { turnEnded = true; return; }
   updateBattleField();
 
-  if (currentDarts.length >= p._maxDartsThisTurn) {
+  const maxed = currentDarts.length >= p._maxDartsThisTurn;
+  if (maxed || wasEndured) {
     turnEnded = true;
     checkEvolution(currentPlayer);
+    if (!p.isCpu) {
+      const nextBtn = document.getElementById('next-player-btn');
+      if (nextBtn) nextBtn.style.display = '';
+    } else {
+      setTimeout(() => advanceTurn(), 800);
+    }
+  }
+}
+
+function endFinishTurn() {
+  turnEnded = true;
+  const p = players[currentPlayer];
+  if (!p.isCpu) {
     const nextBtn = document.getElementById('next-player-btn');
-    if (nextBtn && !p.isCpu) nextBtn.style.display = '';
-    if (p.isCpu) setTimeout(() => advanceTurn(), 800);
+    if (nextBtn) nextBtn.style.display = '';
+  } else {
+    setTimeout(() => advanceTurn(), 800);
   }
 }
 
@@ -717,30 +821,31 @@ function calcEffect(seg, attacker, defender) {
 function applyEffect(result, attackerIdx) {
   const pi = attackerIdx, oi = 1 - attackerIdx;
   const attacker = players[pi], opp = players[oi];
+  let wasEndured = false;
 
   if (result.type === 'damage') {
-    const busted = checkEndure(pi, result.amount);
-    if (!busted) {
+    wasEndured = checkEndure(pi, result.amount);
+    if (!wasEndured) {
       opp.hp = Math.max(0, opp.hp - result.amount);
       attacker.totalDmg += result.amount;
     }
-    sfxHit();
+    sfxPokeDamage();
     flash(`-${result.amount} HP`, 'var(--poke-red)');
     speak(`${result.amount} damage!`);
   } else if (result.type === 'heal') {
     const healed = Math.min(attacker.maxHp - attacker.hp, result.amount);
     attacker.hp = Math.min(attacker.maxHp, attacker.hp + result.amount);
     attacker.totalHeal += healed;
-    sfxHeal();
+    sfxPokeHeal();
     flash(`+${result.amount} HP`, 'var(--hp-green)');
     speak(`Healed ${result.amount}!`);
   } else if (result.type === 'crit') {
-    const busted = checkEndure(pi, result.amount);
-    if (!busted) {
+    wasEndured = checkEndure(pi, result.amount);
+    if (!wasEndured) {
       opp.hp = Math.max(0, opp.hp - result.amount);
       attacker.totalDmg += result.amount;
     }
-    sfxHit();
+    sfxPokeCrit();
     flash(`CRITICAL HIT! -${result.amount}`, '#ff4444');
     speak(`Critical hit! ${result.amount} damage!`);
     if (result.statusInflict) {
@@ -749,8 +854,8 @@ function applyEffect(result, attackerIdx) {
   } else if (result.type === 'bull') {
     if (result.item) applyItem(result.item, attacker);
     if (gameMode === 'gym' && result.amount > 0) {
-      const busted = checkEndure(pi, result.amount);
-      if (!busted) {
+      wasEndured = checkEndure(pi, result.amount);
+      if (!wasEndured) {
         opp.hp = Math.max(0, opp.hp - result.amount);
         attacker.totalDmg += result.amount;
       }
@@ -758,19 +863,18 @@ function applyEffect(result, attackerIdx) {
     sfxBull();
     if (result.statusInflict) {
       setTimeout(() => applyStatus(oi, result.statusInflict), 600);
-    } else if (result.statusInflict === 'dartsteal') {
-      opp.dartLostNext = true;
     }
   } else if (result.type === 'miss') {
     sfxMiss();
     flash('Miss!', 'var(--muted)');
   }
 
-  // Status from Status class on bull: dartsteal
   if (result.statusInflict === 'dartsteal') {
     opp.dartLostNext = true;
     flash('DART STOLEN!', '#a78bfa');
   }
+
+  return wasEndured;
 }
 
 function applyItem(item, player) {
@@ -779,7 +883,7 @@ function applyItem(item, player) {
     player.totalHeal += 60;
     flash('+60 HP (Potion!)', 'var(--hp-green)');
     speak('Potion!');
-    sfxHeal();
+    sfxPokeHeal();
   } else if (item === 'xattack') {
     xAttackBonus = 15;
     flash('X-Attack! +15 DMG', 'var(--amber)');
@@ -796,9 +900,7 @@ function checkEndure(attackerIdx, damage) {
   const oi = 1 - attackerIdx;
   const opp = players[oi];
   if (opp.hp - damage < 0 && opp.hp > 0) {
-    // Endure: restore to HP at start of this turn
     opp.hp = hpAtTurnStart[oi];
-    turnEnded = true;
     flash('ENDURE!', 'var(--poke-red)');
     speak('Endures the hit!');
     sfxMiss();
@@ -983,7 +1085,10 @@ function updateBattleField() {
   if (gameActive) {
     const p = players[currentPlayer];
     const hint = getTargetSuggestion(p);
-    setActionZone(hint, p.isCpu ? 'CPU is thinking...' : 'Throw your darts');
+    const subText = p.isCpu ? 'CPU is thinking...' : (finishMode ? `Hit ${finishTarget - finishTotal} exactly` : 'Throw your darts');
+    setActionZone(hint, subText);
+    const az = document.querySelector('.action-zone');
+    if (az) az.classList.toggle('finish-mode', finishMode);
   }
 }
 
@@ -1006,6 +1111,18 @@ function updateScoringGuide() {
     return;
   }
   guide.classList.add('visible');
+
+  if (finishMode) {
+    const remaining = finishTarget - finishTotal;
+    grid.innerHTML = `
+      <div class="sg-item sg-mega" style="grid-column:1/-1;padding:16px;">
+        <div class="sg-type" style="font-size:13px;letter-spacing:3px;">⚡ FINISH MODE ⚡</div>
+        <div class="sg-value gold" style="font-size:28px;margin:6px 0;">${remaining} HP TO GO</div>
+        <div class="sg-label" style="color:var(--text);font-size:12px;">Face value only · Doubles &amp; Trebles = Single · Bull/Bullseye Heals you</div>
+      </div>`;
+    if (passiveEl) passiveEl.textContent = `Hit ${finishTarget} exactly to win! Total so far: ${finishTotal}`;
+    return;
+  }
 
   const cls    = p.pokemon.cls;
   const isWild = gameMode === 'wild';
@@ -1073,6 +1190,10 @@ function updateScoringGuide() {
 }
 
 function getTargetSuggestion(p) {
+  if (finishMode) {
+    const remaining = finishTarget - finishTotal;
+    return `⚡ FINISH! HIT ${remaining} EXACTLY`;
+  }
   const cls = p.pokemon ? p.pokemon.cls : '';
   if (cls === 'Sniper') return 'AIM FOR TREBLES';
   if (cls === 'Tank' && gameMode === 'wild') return 'HIT EVENS TO HEAL';
@@ -1093,7 +1214,11 @@ function runCpuTurn() {
   let prevSeg = null;
 
   function cpuPickTarget() {
-    const opp = players[1 - currentPlayer];
+    // Finish mode: aim for exactly the remaining amount
+    if (finishMode) {
+      const remaining = finishTarget - finishTotal;
+      return remaining >= 1 && remaining <= 20 ? remaining : 20;
+    }
     // Status class: aim for bull to inflict status
     if (p.pokemon.cls === 'Status' && Math.random() < .3) return 25;
     // Sniper: treble of high number
@@ -1238,6 +1363,11 @@ function handleWS(data) {
 
   // Draft phase
   if (draftPhase && !players[draftStep].isCpu) {
+    // Reset on takeout so the next player's dart is detected
+    if (event === 'Takeout finished' || (tc === 0 && seenThrows > 0)) {
+      seenThrows = 0;
+      return;
+    }
     if (tc > seenThrows) {
       const rawThrow = throws[seenThrows];
       const seg = rawThrow.segment || {};
@@ -1312,21 +1442,45 @@ function flash(text, color = 'var(--gold)') {
 // =============================================
 function sfxEvolution() {
   const ctx = gAC(), t = ctx.currentTime;
-  [784, 1047, 1568].forEach((f, i) => tone(f, 'sine', t + i * .1, .3, .25, ctx));
-  noiz(t + .2, .15, .1, 2000, ctx);
+  [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => tone(f, 'sine', t + i * .08, .22, .2, ctx));
+  noiz(t + .3, .2, .12, 2400, ctx);
 }
 function sfxBull() {
   const ctx = gAC(), t = ctx.currentTime;
-  [523, 784, 1047].forEach((f, i) => tone(f, 'triangle', t + i * .07, .25, .2, ctx));
+  [392, 523, 659, 784, 1047].forEach((f, i) => tone(f, 'triangle', t + i * .06, .22, .18, ctx));
+  noiz(t + .05, .1, .05, 1800, ctx);
 }
 function sfxStatus() {
   const ctx = gAC(), t = ctx.currentTime;
-  tone(220, 'sawtooth', t, .2, .15, ctx);
-  tone(180, 'sawtooth', t + .1, .15, .1, ctx);
+  tone(330, 'sawtooth', t, .18, .12, ctx);
+  tone(247, 'sawtooth', t + .08, .15, .1, ctx);
+  tone(185, 'sawtooth', t + .16, .12, .1, ctx);
 }
-function sfxHeal() {
+function sfxPokeDamage() {
   const ctx = gAC(), t = ctx.currentTime;
-  [523, 659, 784].forEach((f, i) => tone(f, 'sine', t + i * .07, .18, .15, ctx));
+  noiz(t, .25, .06, 3000, ctx);
+  tone(110, 'sawtooth', t + .02, .2, .1, ctx);
+  tone(80, 'square', t + .05, .15, .08, ctx);
+}
+function sfxPokeHeal() {
+  const ctx = gAC(), t = ctx.currentTime;
+  [523, 659, 784, 1047].forEach((f, i) => tone(f, 'sine', t + i * .06, .16, .14, ctx));
+  tone(1319, 'sine', t + .28, .12, .18, ctx);
+}
+function sfxPokeCrit() {
+  const ctx = gAC(), t = ctx.currentTime;
+  noiz(t, .3, .04, 4000, ctx);
+  [220, 330, 440, 660, 880].forEach((f, i) => tone(f, 'square', t + i * .04, .18, .08, ctx));
+}
+function sfxFinishMode() {
+  const ctx = gAC(), t = ctx.currentTime;
+  [262, 330, 392, 523, 659, 784].forEach((f, i) => tone(f, 'triangle', t + i * .07, .2, .15, ctx));
+  noiz(t + .35, .15, .08, 1500, ctx);
+}
+function sfxBust() {
+  const ctx = gAC(), t = ctx.currentTime;
+  [440, 330, 220, 147].forEach((f, i) => tone(f, 'sawtooth', t + i * .08, .2, .12, ctx));
+  noiz(t + .1, .2, .1, 200, ctx);
 }
 
 // =============================================
