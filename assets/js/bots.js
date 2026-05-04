@@ -117,11 +117,10 @@ function generateCpuThrow(target, mpr, opts) {
 
   // ── Tangential sigma (angular scatter) ───────────────────────
   // Controls how often the dart lands on the right segment vs neighbours.
-  // Power-law anchored at the confirmed 0.9 calibration point (54mm → actual ~0.9 MPR).
-  // Drops steeply so 1.3 and 1.8 players are genuinely more accurate to their segment.
-  // 0.9→54mm  1.3→26mm  1.8→13.5mm  3.0→5mm(floor)  6.0→5mm(floor)
-  let sigmaT = Math.max(5, 54 * Math.pow(0.9 / mpr, 2));
-  sigmaT = Math.min(80, sigmaT);
+  // Curved dropoff anchored at 0.9 MPR (54mm → actual ~0.9 MPR).
+  // Floor term of 5 keeps elite players consistent without perfect accuracy.
+  // 0.9→54mm  1.3→33mm  1.8→22mm  3.0→13mm  5.2→8.5mm
+  let sigmaT = Math.min(80, 5 + 49 * Math.pow(0.9 / mpr, 1.5));
   sigmaT /= roundForm;
   sigmaT *= Math.max(0.70, 1 - (missStreak * 0.06));
   if (opts.sigmaMultiplier && opts.sigmaMultiplier !== 1.0) sigmaT *= opts.sigmaMultiplier;
