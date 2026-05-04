@@ -116,11 +116,12 @@ function generateCpuThrow(target, mpr, opts) {
   const roundForm  = opts.roundForm  || 1.0;
 
   // ── Tangential sigma (angular scatter) ───────────────────────
-  // Controls how often the dart lands on the right segment vs drifting to
-  // neighbours or non-cricket numbers. This is the primary skill axis.
-  // Hyperbolic: 0.5→78mm  0.9→54mm  1.3→41mm  1.8→32mm  3.0→21mm  6.0→11mm
-  let sigmaT = 70 / (mpr + 0.4);
-  sigmaT = Math.max(5, Math.min(80, sigmaT));
+  // Controls how often the dart lands on the right segment vs neighbours.
+  // Power-law anchored at the confirmed 0.9 calibration point (54mm → actual ~0.9 MPR).
+  // Drops steeply so 1.3 and 1.8 players are genuinely more accurate to their segment.
+  // 0.9→54mm  1.3→26mm  1.8→13.5mm  3.0→5mm(floor)  6.0→5mm(floor)
+  let sigmaT = Math.max(5, 54 * Math.pow(0.9 / mpr, 2));
+  sigmaT = Math.min(80, sigmaT);
   sigmaT /= roundForm;
   sigmaT *= Math.max(0.70, 1 - (missStreak * 0.06));
   if (opts.sigmaMultiplier && opts.sigmaMultiplier !== 1.0) sigmaT *= opts.sigmaMultiplier;
@@ -186,6 +187,16 @@ function generateCpuThrow(target, mpr, opts) {
   else if (hitR <= 107){ bed = 'Triple';      mul = 3; }
   else if (hitR <= 162){ bed = 'SingleOuter'; mul = 1; }
   else                 { bed = 'Double';      mul = 2; }
+
+  // Acceptance probability — geometric board scatter naturally produces ~10% multiples;
+  // override to match calibrated rates: 0.9→2.35%  1.3→2.95%  1.8→3.7%  (≈1-4 per 30 rounds)
+  if (mul > 1) {
+    const targetMultipleRate = 0.01 + mpr * 0.015;
+    if (Math.random() > targetMultipleRate / 0.10) {
+      mul = 1;
+      bed = 'SingleOuter';
+    }
+  }
 
   // Determine Segment Number
   let angleFromTop = (Math.PI / 2) - hitTheta;
