@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "mcp__plugin_neon_neon__list_projects",
-      "mcp__plugin_neon_neon__run_sql"
+      "mcp__plugin_neon_neon__run_sql",
+      "mcp__plugin_neon_neon__describe_table_schema"
     ]
   }
 }

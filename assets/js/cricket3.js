@@ -202,6 +202,7 @@ const VARIANTS = {
   noscore:   'No points. First player to close all numbers wins.'
 };
 
+let testMode = false;
 let gameVariant = 'standard';
 let players = [];
 let currentPlayer = 0;
@@ -231,8 +232,8 @@ async function flushThrowsToNeon() {
       await sql`INSERT INTO players (name) VALUES (${pName}) ON CONFLICT DO NOTHING`;
     }
     const promises = throws.map(t =>
-      sql`INSERT INTO throws (player_name, target_number, hit_segment, hit_multiplier, x_coord, y_coord, game_id, round_number, dart_in_turn, mpr_at_throw, variant, marks_before)
-          VALUES (${t.playerName}, ${t.targetAim}, ${t.seg.name}, ${t.seg.multiplier}, ${t.coords?.x ?? null}, ${t.coords?.y ?? null}, ${t.gameId}, ${t.round}, ${t.dartInTurn}, ${t.mprAtThrow ?? null}, ${t.variant}, ${t.marksBefore ?? null})`
+      sql`INSERT INTO throws (player_name, target_number, hit_segment, hit_multiplier, x_coord, y_coord, game_id, round_number, dart_in_turn, mpr_at_throw, variant, marks_before, is_cpu, target_mpr)
+          VALUES (${t.playerName}, ${t.targetAim}, ${t.seg.name}, ${t.seg.multiplier}, ${t.coords?.x ?? null}, ${t.coords?.y ?? null}, ${t.gameId}, ${t.round}, ${t.dartInTurn}, ${t.mprAtThrow ?? null}, ${t.variant}, ${t.marksBefore ?? null}, ${t.isCpu ?? false}, ${t.targetMpr ?? null})`
     );
     await Promise.all(promises);
     console.log(`✅ Synced ${throws.length} throws to Neon DB.`);
@@ -300,6 +301,12 @@ function selectVariant(v, btn){
   btn.classList.add('sel');
   document.getElementById('variant-desc').textContent = VARIANTS[v];
   document.getElementById('game-variant-badge').textContent = v.toUpperCase();
+}
+
+function setTestMode(val) {
+  testMode = val;
+  if (val) cancelSpeech();
+  try { localStorage.setItem('dartbot_testmode', val ? '1' : '0'); } catch {}
 }
 
 function buildCpuGrid(){
@@ -441,6 +448,7 @@ function startGame(){
 }
 
 function launchLeg(){
+  if (window._cpuAutoTimer) { clearInterval(window._cpuAutoTimer); window._cpuAutoTimer = null; }
   cancelSpeech();
   document.getElementById('confetti').innerHTML = '';
   players.forEach(p => {
@@ -466,9 +474,9 @@ function launchLeg(){
   enterFullscreen();
   setTimeout(() => {
     updateScoreboard();
-    speak(`${playerCallName(players[currentPlayer])}, you're up first`);
+    if (!testMode) speak(`${playerCallName(players[currentPlayer])}, you're up first`);
     startTurn();
-  }, 100);
+  }, testMode ? 0 : 100);
 }
 
 function nextLeg(){
@@ -488,6 +496,7 @@ function nextLeg(){
 }
 
 function goToMenu(){
+  if (window._cpuAutoTimer) { clearInterval(window._cpuAutoTimer); window._cpuAutoTimer = null; }
   gameActive = false;
   stopWinMusic();
   exitFullscreen();
@@ -653,11 +662,23 @@ function startTurn(){
   if(nextBtn) nextBtn.style.display = 'none';
   updateScoreboard();
   const nameEl = document.getElementById('turn-player-name');
-  nameEl.textContent = p.name;
-  nameEl.classList.toggle('cpu-turn', p.isCpu);
-  document.getElementById('turn-sub').textContent = p.isCpu ? 'Computer thinking...' : 'Throw your darts';
+  const subEl = document.getElementById('turn-sub');
+  const allCpuSim = testMode && players.every(q => q.isCpu);
+  if (allCpuSim) {
+    nameEl.textContent = 'TEST MODE';
+    nameEl.style.color = 'var(--red)';
+    nameEl.classList.remove('cpu-turn');
+    subEl.textContent = `Game ${legNumber + 1}`;
+    subEl.style.color = 'var(--red)';
+  } else {
+    nameEl.textContent = p.name;
+    nameEl.style.color = '';
+    nameEl.classList.toggle('cpu-turn', p.isCpu);
+    subEl.textContent = p.isCpu ? 'Computer thinking...' : 'Throw your darts';
+    subEl.style.color = '';
+  }
   if(p.isCpu){
-    setTimeout(() => runCpuTurn(), 3000);
+    setTimeout(() => runCpuTurn(), testMode ? 0 : 3000);
   }
 }
 
@@ -670,7 +691,7 @@ function advanceTurn(){
   round = Math.floor(turnsCompleted / players.length) + 1;
   currentPlayer = next;
   updateScoreboard();
-  setTimeout(() => { speak(playerCallName(players[currentPlayer])); startTurn(); advancing = false; }, 600);
+  setTimeout(() => { if (!testMode) speak(playerCallName(players[currentPlayer])); startTurn(); advancing = false; }, testMode ? 0 : 600);
 }
 
 function resetDartSlots(){
@@ -719,7 +740,9 @@ function registerDart(seg, coords = null){
       dartInTurn: currentDarts.length + 1,
       mprAtThrow,
       variant: gameVariant,
-      marksBefore
+      marksBefore,
+      isCpu: p.isCpu,
+      targetMpr: p.isCpu ? p.cpuData.mpr : null
     };
     if (!p.isCpu && coords) {
       pendingThrowsToSave.push(throwRecord);
@@ -733,7 +756,7 @@ function registerDart(seg, coords = null){
   if(dartIsMiss || !isInPlay){
     currentDarts.push({score:0, label:'Miss', num:0, mul:0});
     updateDartSlot(dartIdx, 'Miss', 'miss');
-    sfxMiss();
+    if (!testMode) sfxMiss();
   } else {
     const marks = Math.min(mul, 3);
     let marksToScore = 0;
@@ -780,26 +803,26 @@ function registerDart(seg, coords = null){
     const numWord = num === 25 ? 'Bull' : String(num);
 
     if(wasClosed && !scored){
-      sfxMiss();
+      if (!testMode) sfxMiss();
     } else if(justClosedAll){
-      sfxClose();
+      if (!testMode) sfxClose();
       flash('CLOSED!', 'var(--red)');
-      speak(`Closed ${numWord}`);
+      if (!testMode) speak(`Closed ${numWord}`);
     } else if(justClosed && scored > 0){
-      sfxCloseAndScore();
+      if (!testMode) sfxCloseAndScore();
       flash(`OPENED ${numWord}`, 'var(--green)');
-      speak(`Opened ${numWord}`);
+      if (!testMode) speak(`Opened ${numWord}`);
     } else if(justClosed){
-      sfxClose();
+      if (!testMode) sfxClose();
       flash(`OPENED ${numWord}`, 'var(--green)');
-      speak(`Opened ${numWord}`);
+      if (!testMode) speak(`Opened ${numWord}`);
     } else if(scored > 0){
-      sfxScore();
+      if (!testMode) sfxScore();
       flash(`+${scored}`, 'var(--gold)');
-      speak(dn);
+      if (!testMode) speak(dn);
     } else {
-      sfxHit();
-      speak(dn);
+      if (!testMode) sfxHit();
+      if (!testMode) speak(dn);
     }
 
     const cell = document.getElementById(`mcell-${num}-${currentPlayer}`);
@@ -824,7 +847,7 @@ function registerDart(seg, coords = null){
     const nextBtn = document.getElementById('next-player-btn');
     if(nextBtn && !p.isCpu) nextBtn.style.display = '';
     const turnScored = currentDarts.reduce((s, d) => s + (d.score || 0), 0);
-    if(turnScored > 0) setTimeout(() => speak(String(p.score)), 1200);
+    if(turnScored > 0 && !testMode) setTimeout(() => speak(String(p.score)), 1200);
   }
 }
 
@@ -954,12 +977,13 @@ function runCpuTurn(){
     cb && cb();
   }
 
+  const td = testMode ? 0 : 1000;
   doThrow(0, () => {
     setTimeout(() => doThrow(1, () => {
       setTimeout(() => doThrow(2, () => {
-        setTimeout(() => advanceTurn(), 800);
-      }), 1000);
-    }), 1000);
+        setTimeout(() => advanceTurn(), testMode ? 0 : 800);
+      }), td);
+    }), td);
   });
 }
 
@@ -1014,6 +1038,43 @@ function checkWin(idx){
   return myScore >= highestScore;
 }
 
+// ── Game record ─────────────────────────────────────────────
+async function saveGameToNeon(winnerIdx) {
+  if (!sql) return;
+  const winner = players[winnerIdx];
+  const totalRounds = Math.ceil(turnsCompleted / players.length);
+  try {
+    await sql`
+      INSERT INTO games (game_id, variant, leg_number, session_id, winner_name, total_rounds)
+      VALUES (${gameId}, ${gameVariant}, ${legNumber}, ${getSessionKey()}, ${winner.name}, ${totalRounds})
+      ON CONFLICT (game_id) DO NOTHING
+    `;
+    for (const p of players) {
+      const finalMpr = p.dartsThrown >= 3 ? p.marksThrown / (p.dartsThrown / 3) : null;
+      await sql`
+        INSERT INTO game_players (game_id, player_name, is_cpu, target_mpr, final_mpr, marks_thrown, darts_thrown, final_score, won)
+        VALUES (${gameId}, ${p.name}, ${p.isCpu}, ${p.isCpu ? p.cpuData.mpr : null}, ${finalMpr ?? null}, ${p.marksThrown}, ${p.dartsThrown}, ${p.score}, ${p === winner})
+        ON CONFLICT DO NOTHING
+      `;
+      if (p.isCpu && p.cpuData) {
+        await sql`UPDATE players SET target_mpr = ${p.cpuData.mpr}, cpu_id = ${p.cpuData.id} WHERE name = ${p.name}`;
+      }
+    }
+    console.log(`✅ Game ${gameId} saved to Neon.`);
+  } catch (e) { console.error('Neon DB Error (Game):', e); }
+}
+
+// ── CPU auto-continue ────────────────────────────────────────
+function stopCpuAuto() {
+  if (window._cpuAutoTimer) { clearInterval(window._cpuAutoTimer); window._cpuAutoTimer = null; }
+  const autoEl = document.getElementById('cpu-auto-msg');
+  const stopBtn = document.getElementById('cpu-stop-btn');
+  const nextBtn = document.getElementById('next-leg-btn');
+  if (autoEl) autoEl.style.display = 'none';
+  if (stopBtn) stopBtn.style.display = 'none';
+  if (nextBtn) nextBtn.style.display = '';
+}
+
 // ── Win music ──
 let _winAudio = null;
 
@@ -1035,8 +1096,8 @@ function stopWinMusic() {
 async function endWithWinner(idx){
   gameActive = false;
   const winner = players[idx];
-  playWinMusic();
-  speak(`${playerCallName(winner)} wins!`, true);
+  if (!testMode) playWinMusic();
+  if (!testMode) speak(`${playerCallName(winner)} wins!`, true);
   const mprOf = p => p.dartsThrown >= 3
     ? (p.marksThrown / (p.dartsThrown / 3)).toFixed(2)
     : '0.00';
@@ -1057,10 +1118,11 @@ async function endWithWinner(idx){
       <div class="win-other-score" style="font-size:13px;margin-top:4px;">${statsOf(p)}</div>
     </div>`)
     .join('');
-  players.forEach((p, i) => {
-    savePlayerStat(p.name, p.flag, i === idx, p.marksThrown, p.dartsThrown, p.isCpu);
-  });
+  await Promise.all(players.map((p, i) =>
+    savePlayerStat(p.name, p.flag, i === idx, p.marksThrown, p.dartsThrown, p.isCpu)
+  ));
   await flushThrowsToNeon();
+  await saveGameToNeon(idx);
 
   // Session tracking
   const key = getSessionKey();
@@ -1086,8 +1148,33 @@ async function endWithWinner(idx){
     }
   }
 
-  spawnConfetti();
+  if (!testMode) spawnConfetti();
   showScreen('winner');
+
+  // CPU vs CPU: auto-advance to next leg after countdown
+  const allCpu = players.every(p => p.isCpu);
+  if (allCpu) {
+    let secs = testMode ? 1 : 5;
+    const autoEl = document.getElementById('cpu-auto-msg');
+    const stopBtn = document.getElementById('cpu-stop-btn');
+    const nextBtn = document.getElementById('next-leg-btn');
+    if (autoEl) { autoEl.textContent = `Next leg in ${secs}s…`; autoEl.style.display = ''; }
+    if (stopBtn) stopBtn.style.display = '';
+    if (nextBtn) nextBtn.style.display = 'none';
+    window._cpuAutoTimer = setInterval(() => {
+      secs--;
+      if (secs > 0) {
+        if (autoEl) autoEl.textContent = `Next leg in ${secs}s…`;
+      } else {
+        clearInterval(window._cpuAutoTimer);
+        window._cpuAutoTimer = null;
+        if (autoEl) autoEl.style.display = 'none';
+        if (stopBtn) stopBtn.style.display = 'none';
+        if (nextBtn) nextBtn.style.display = '';
+        nextLeg();
+      }
+    }, 1000);
+  }
 }
 
 function endGame(){
@@ -1169,6 +1256,12 @@ document.addEventListener('keydown', e => {
 // INIT
 // =============================================
 document.addEventListener('DOMContentLoaded', () => {
+  const savedTM = localStorage.getItem('dartbot_testmode') === '1';
+  if (savedTM) {
+    testMode = true;
+    const cb = document.getElementById('test-mode-toggle');
+    if (cb) cb.checked = true;
+  }
   initNeonDB();
   buildCpuGrid();
   renderRecentPlayers();
