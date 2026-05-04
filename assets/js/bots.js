@@ -114,43 +114,34 @@ function generateCpuThrow(target, mpr, opts) {
   const prevSeg    = opts.prevSeg    || null;
   const missStreak = opts.missStreak || 0;
   const roundForm  = opts.roundForm  || 1.0;
-  const dartsThrown= opts.dartsThrown|| 0;
 
-  // Base standard deviation (sigma) in mm.
-  // Raised floor and steeper slope vs the old formula so low-MPR players
-  // scatter far more and high-MPR players are only marginally affected.
-  // MPR 0.5 → ~61mm  |  MPR 0.9 → ~57mm  |  MPR 3.0 → ~33mm  |  MPR 6.0 → ~10mm
-  let baseSigma = 66 - (9.5 * mpr);
+  // ── Tangential sigma (angular scatter) ───────────────────────
+  // Controls how often the dart lands on the right segment vs drifting to
+  // neighbours or non-cricket numbers. This is the primary skill axis.
+  // Hyperbolic: 0.5→78mm  0.9→54mm  1.3→41mm  1.8→32mm  3.0→21mm  6.0→11mm
+  let sigmaT = 70 / (mpr + 0.4);
+  sigmaT = Math.max(5, Math.min(80, sigmaT));
+  sigmaT /= roundForm;
+  sigmaT *= Math.max(0.70, 1 - (missStreak * 0.06));
+  if (opts.sigmaMultiplier && opts.sigmaMultiplier !== 1.0) sigmaT *= opts.sigmaMultiplier;
+  if (Math.random() < 0.03) sigmaT *= (1.5 + Math.random()); // occasional yip
 
-  baseSigma = Math.max(5, Math.min(80, baseSigma));
+  // ── Radial sigma (ring scatter) ──────────────────────────────
+  // Controls how often the dart drifts into the treble or double ring.
+  // Kept small for everyone — trebles/doubles are rare bonus events, not a skill axis.
+  // Calibrated to give ~1-2 multiples per 30 rounds at 0.9, ~3-4 at 1.8:
+  //   P(|radial drift| > 27.5mm) ≈ 2×Φ(-27.5/σR)
+  //   0.9→σR=12.4mm→2.3/30rds  1.3→σR=13.0mm→3.1/30rds  1.8→σR=13.7mm→4.0/30rds
+  const sigmaR = Math.max(8, Math.min(18, 11 + mpr * 1.5));
 
-  // Apply roundForm (higher form = better throw = tighter variance)
-  let currentSigma = baseSigma / roundForm;
-
-  // Miss streak recovery: tighten focus by up to 30% after sustained misses
-  currentSigma *= Math.max(0.70, 1 - (missStreak * 0.06));
-
-  // Adaptive difficulty: caller can pass a multiplier to rubber-band actual MPR to target
-  if (opts.sigmaMultiplier && opts.sigmaMultiplier !== 1.0) {
-    currentSigma *= opts.sigmaMultiplier;
-  }
-
-  // Occasional random wild dart (yips / slip) ~3% chance
-  if (Math.random() < 0.03) {
-    currentSigma *= (1.5 + Math.random());
-  }
-
-  // Target Cartesian Coordinates
-  // Low-skill players aim at the single outer bed (130mm) rather than the treble (103mm).
-  // Only skilled players (MPR ≥ 4.0) aim directly at the treble ring.
+  // ── Aim point ────────────────────────────────────────────────
+  // Centre of the single outer bed: 134.5mm (midpoint of 107mm treble edge → 162mm double edge).
   let aimR = 0, aimTheta = 0;
   if (target !== 25) {
-    const trebleBlend = Math.max(0, Math.min(1, (mpr - 1.0) / 2.0));
-    aimR = 130 - trebleBlend * 27; // 130mm at MPR≤1.0 → 103mm at MPR≥3.0
+    aimR = 134.5;
     aimTheta = getSectorAngle(target);
   }
 
-  // Deflection: If aim bed is occupied, drift aim slightly down towards bull
   if (prevSeg && prevSeg.number === target && prevSeg.multiplier === 3 && target !== 25) {
     aimR -= 5;
   }
@@ -158,9 +149,21 @@ function generateCpuThrow(target, mpr, opts) {
   const aimX = aimR * Math.cos(aimTheta);
   const aimY = aimR * Math.sin(aimTheta);
 
-  // Apply Gaussian distribution
-  const hitX = aimX + randn_bm() * currentSigma;
-  const hitY = aimY + randn_bm() * currentSigma;
+  // ── Elliptical Gaussian ──────────────────────────────────────
+  // Apply sigmaR along the radial axis and sigmaT along the tangential axis.
+  // For bull (aimR=0, no meaningful radial direction) use sigmaT for both.
+  let hitX, hitY;
+  if (target === 25) {
+    hitX = randn_bm() * sigmaT;
+    hitY = randn_bm() * sigmaT;
+  } else {
+    const radialX =  Math.cos(aimTheta);
+    const radialY =  Math.sin(aimTheta);
+    const tangX   = -Math.sin(aimTheta);
+    const tangY   =  Math.cos(aimTheta);
+    hitX = aimX + randn_bm() * sigmaR * radialX + randn_bm() * sigmaT * tangX;
+    hitY = aimY + randn_bm() * sigmaR * radialY + randn_bm() * sigmaT * tangY;
+  }
 
   // Resolve polar coordinates back to a dartboard segment
   const hitR = Math.sqrt(hitX*hitX + hitY*hitY);
