@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cricket 3 — Autodarts</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎯</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/game.css?v=2">
+<script src="../assets/js/autodarts.js?v=2"></script>
+<script src="../assets/js/utils.js?v=2"></script>
+<script src="../assets/js/bots.js?v=2"></script>
+<link rel="stylesheet" href="../assets/css/cricket3.css?v=3">
+</head>
+<body>
+
+<!-- SETUP -->
+<div id="setup" class="screen active">
+  <div class="setup-title">CRICKET 3 <span>🎯</span></div>
+
+  <div class="setup-card">
+    <h3>Game Variant</h3>
+    <div class="variant-grid">
+      <button class="variant-btn sel" data-v="standard" onclick="selectVariant('standard',this)">Standard</button>
+      <button class="variant-btn" data-v="cutthroat" onclick="selectVariant('cutthroat',this)">Cut-throat</button>
+      <button class="variant-btn" data-v="noscore" onclick="selectVariant('noscore',this)">No-score</button>
+    </div>
+    <div class="variant-desc" id="variant-desc">Close 20→15 & Bull. Score points on open numbers. First to close all with highest score wins.</div>
+  </div>
+
+  <div class="setup-card">
+    <h3>Players <span id="player-count-label" style="color:var(--muted);font-size:12px;">(1–4)</span></h3>
+    <div id="player-list"></div>
+    <div class="add-btns">
+      <button class="add-btn add-human-btn" onclick="openHumanModal()">+ Human Player</button>
+      <button class="add-btn add-cpu-btn" onclick="openCpuModal()">+ Computer Player</button>
+    </div>
+    <div id="recent-players" class="recent-players"></div>
+  </div>
+
+  <div style="display:flex; align-items:center; gap:12px; padding:12px 16px; background:var(--bg2); border:1px solid var(--border2); border-radius:10px; margin-bottom:12px;">
+    <label style="display:flex; align-items:center; gap:12px; cursor:pointer; width:100%;">
+      <input type="checkbox" id="test-mode-toggle" onchange="setTestMode(this.checked)" style="width:18px;height:18px;accent-color:var(--amber);cursor:pointer;flex-shrink:0;">
+      <div>
+        <div style="font-family:'Orbitron',monospace; font-size:12px; color:var(--amber); font-weight:700; letter-spacing:1px;">TEST MODE</div>
+        <div style="font-family:'Share Tech Mono',monospace; font-size:11px; color:var(--muted); margin-top:2px;">No delays · No sound · CPU legs auto-chain instantly</div>
+      </div>
+    </label>
+  </div>
+
+  <button class="start-btn" id="start-btn" onclick="startGame()" disabled>START GAME</button>
+  <button class="stats-btn" onclick="showStatsModal()">📊 Stats</button>
+</div>
+
+<!-- CPU MODAL -->
+<div id="cpu-modal" class="modal-overlay">
+  <div class="cpu-modal-box">
+    <h2>SELECT OPPONENT</h2>
+    <div class="cpu-grid" id="cpu-grid"></div>
+    <button class="cpu-modal-cancel" onclick="closeCpuModal()">Cancel</button>
+  </div>
+</div>
+
+<!-- HUMAN MODAL -->
+<div id="human-modal" class="modal-overlay">
+  <div class="cpu-modal-box" style="width:min(420px, 96vw);">
+    <h2>ADD HUMAN PLAYER</h2>
+    <input type="text" id="new-human-name" class="modal-input" placeholder="Enter Name" maxlength="14">
+    <select id="new-human-flag" class="modal-input" style="cursor:pointer;">
+      <option value="sco" selected>Scotland</option>
+      <option value="eng">England</option>
+      <option value="wal">Wales</option>
+    </select>
+    <div style="display:flex; gap:14px; margin-top:10px;">
+      <button class="win-btn win-btn-primary" onclick="confirmAddHuman()">ADD PLAYER</button>
+      <button class="win-btn" onclick="closeHumanModal()">CANCEL</button>
+    </div>
+  </div>
+</div>
+
+<!-- GAME -->
+<div id="game" class="screen">
+  <div id="scoreboard">
+    <div class="sb-top" id="sb-top"></div>
+    <div class="sb-body" id="sb-body"></div>
+  </div>
+  <div id="side-panel">
+    <div>
+      <div class="panel-label">Current Turn</div>
+      <div class="turn-info">
+        <div class="turn-player" id="turn-player-name">—</div>
+        <div class="turn-sub" id="turn-sub">Throw your darts</div>
+      </div>
+    </div>
+    <div>
+      <div class="panel-label">Darts</div>
+      <div class="dart-slots" id="dart-slots">
+        <div class="dart-slot" id="ds0"><div class="dart-slot-label">1ST</div><div class="dart-slot-val">—</div></div>
+        <div class="dart-slot" id="ds1"><div class="dart-slot-label">2ND</div><div class="dart-slot-val">—</div></div>
+        <div class="dart-slot" id="ds2"><div class="dart-slot-label">3RD</div><div class="dart-slot-val">—</div></div>
+      </div>
+    </div>
+    <div>
+      <div class="panel-label">Aim For</div>
+      <div class="target-box">
+        <div class="target-label">TARGET</div>
+        <div class="target-val" id="target-val">20</div>
+      </div>
+    </div>
+    <div>
+      <div class="panel-label">Round</div>
+      <div class="round-box">
+        <div class="round-num" id="round-num">1</div>
+        <div class="round-sub">ROUND</div>
+      </div>
+    </div>
+    <div class="variant-badge" id="game-variant-badge">STANDARD</div>
+
+    <div class="keypad-wrap">
+      <div class="keypad-row">
+        <button class="kp-btn" onclick="manualDart(20)">20</button>
+        <button class="kp-btn" onclick="manualDart(19)">19</button>
+        <button class="kp-btn" onclick="manualDart(18)">18</button>
+        <button class="kp-btn" onclick="manualDart(17)">17</button>
+      </div>
+      <div class="keypad-row">
+        <button class="kp-btn" onclick="manualDart(16)">16</button>
+        <button class="kp-btn" onclick="manualDart(15)">15</button>
+        <button class="kp-btn" onclick="manualDart(25)">BULL</button>
+        <button class="kp-btn kp-miss" onclick="manualDart(0)">MISS</button>
+      </div>
+      <div class="keypad-row">
+        <button class="kp-btn kp-mod" id="mod-double" onclick="toggleKeypadMod(2)">DOUBLE</button>
+        <button class="kp-btn kp-mod" id="mod-treble" onclick="toggleKeypadMod(3)">TREBLE</button>
+        <button class="kp-btn kp-undo" onclick="undoLastDart()">UNDO</button>
+      </div>
+    </div>
+
+    <div class="game-ws">
+      <div class="ws-dot" id="game-ws-dot"></div>
+      <div class="ws-label" id="game-ws-label">Not Connected</div>
+    </div>
+    <button class="end-btn" id="next-player-btn" onclick="advanceTurn()" style="display:none; border-color:var(--green); color:var(--green);">NEXT PLAYER →</button>
+    <button class="end-btn" onclick="showLog()" style="margin-bottom:8px; border-color:var(--amber); color:var(--amber);">Show Throw Log</button>
+    <button class="end-btn" onclick="endGame()">End Game</button>
+  </div>
+</div>
+
+<!-- WINNER -->
+<div id="winner" class="screen">
+  <div class="winner-layout">
+    <div class="win-card" style="width: 100%;">
+      <div class="win-trophy">🏆</div>
+      <div class="win-label">WINNER</div>
+      <div class="win-name" id="win-name">—</div>
+      <div class="win-score" id="win-details">—</div>
+    </div>
+    <div id="win-others"></div>
+    <div id="win-session" style="display:none;color:var(--blue);font-family:'Orbitron',monospace;font-size:14px;letter-spacing:1px;text-align:center;padding:8px 0;"></div>
+
+    <div class="setup-card" style="width: 100%; margin-top: 4px;">
+      <h3>Next Match Roster</h3>
+      <div id="player-list-winner"></div>
+      <div class="add-btns">
+        <button class="add-btn add-human-btn" onclick="openHumanModal()">+ Human Player</button>
+        <button class="add-btn add-cpu-btn" onclick="openCpuModal()">+ Computer Player</button>
+      </div>
+      <div id="recent-players-winner" class="recent-players"></div>
+    </div>
+
+    <div id="cpu-auto-msg" style="display:none; text-align:center; color:var(--muted); font-family:'Share Tech Mono',monospace; font-size:13px; padding:4px 0;"></div>
+    <div class="win-buttons">
+      <button class="win-btn win-btn-primary" id="next-leg-btn" onclick="nextLeg()" style="font-size: 18px; padding: 20px;">PLAY NEXT LEG</button>
+      <button class="win-btn" id="cpu-stop-btn" onclick="stopCpuAuto()" style="display:none; border-color:var(--amber); color:var(--amber);">STOP AUTO</button>
+      <button class="win-btn win-btn-danger" onclick="goToMenu()">MENU</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOG MODAL -->
+<div id="log-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:999; align-items:center; justify-content:center; flex-direction:column; padding:20px; backdrop-filter:blur(4px);">
+  <h2 style="color:var(--blue); font-family:'Orbitron',monospace; margin-bottom:16px;">Raw Throw Log</h2>
+  <textarea id="log-output" style="width:min(800px, 90%); height:60vh; background:var(--bg2); color:var(--green); font-family:'Share Tech Mono',monospace; padding:16px; border:2px solid var(--border2); border-radius:12px; outline:none; resize:none;"></textarea>
+  <div style="display:flex; gap:14px; margin-top:20px;">
+    <button class="win-btn win-btn-primary" onclick="copyLog()">Copy to Clipboard</button>
+    <button class="win-btn" onclick="closeLog()">Close</button>
+  </div>
+</div>
+
+<!-- STATS MODAL -->
+<div id="stats-modal" class="modal-overlay" style="display:none;">
+  <div class="stats-modal-box">
+    <h2>PLAYER STATS</h2>
+    <div id="stats-content"></div>
+    <div style="display:flex; gap:12px; margin-top:20px; justify-content:center;">
+      <button class="win-btn win-btn-primary" id="stats-cloud-btn" onclick="loadStatsFromCloud()" style="display:none;">↻ Load from Cloud</button>
+      <button class="win-btn" onclick="closeStatsModal()">CLOSE</button>
+    </div>
+  </div>
+</div>
+
+<div id="confetti"></div>
+<div id="announce"></div>
+<div id="broadcast-event" aria-live="polite">
+  <div class="be-kicker" id="be-kicker"></div>
+  <div class="be-main" id="be-main"></div>
+  <div class="be-sub" id="be-sub"></div>
+</div>
+<script src="../assets/js/cricket3.js?v=3"></script>
+</body>
+</html>
