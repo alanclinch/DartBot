@@ -265,8 +265,9 @@ body{
 .start-btn:hover{transform:translateY(-3px);box-shadow:0 9px 0 #09152a,0 0 42px rgba(96,165,250,.65),0 16px 42px rgba(96,165,250,.4);}
 .start-btn:disabled{opacity:.28;cursor:not-allowed;transform:none;box-shadow:none;border-color:var(--border2);}
 .settings-grid{
-  display:flex;flex-direction:row;flex-wrap:wrap;
-  gap:10px 24px;
+  display:flex;flex-direction:row;
+  justify-content:space-between;
+  gap:10px;
 }
 .setting-actions{
   display:flex;justify-content:center;gap:32px;
