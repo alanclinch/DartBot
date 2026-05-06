@@ -42,11 +42,21 @@
 
   <div class="setup-card">
     <h3>Settings</h3>
-    <label class="setting-row">
-      <input type="checkbox" id="test-mode-toggle" onchange="setTestMode(this.checked)">
-      <span>Test Mode</span>
-    </label>
-    <button class="setting-stats-btn" onclick="showStatsModal()">📊 View Stats</button>
+    <div class="settings-grid">
+      <label class="setting-row">
+        <input type="checkbox" id="voice-toggle" onchange="setVoice(this.checked)" checked>
+        <span>Voice Caller</span>
+      </label>
+      <label class="setting-row">
+        <input type="checkbox" id="sfx-toggle" onchange="setSfx(this.checked)" checked>
+        <span>Sound Effects</span>
+      </label>
+      <label class="setting-row">
+        <input type="checkbox" id="test-mode-toggle" onchange="setTestMode(this.checked)">
+        <span>Test Mode</span>
+      </label>
+      <button class="setting-stats-btn" onclick="showStatsModal()">View Stats</button>
+    </div>
   </div>
 </div>
 

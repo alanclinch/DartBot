@@ -204,6 +204,8 @@ const VARIANTS = {
 };
 
 let testMode = false;
+let voiceEnabled = true;
+let sfxEnabled = true;
 let gameVariant = 'standard';
 let players = [];
 let currentPlayer = 0;
@@ -308,6 +310,15 @@ function setTestMode(val) {
   testMode = val;
   if (val) cancelSpeech();
   try { localStorage.setItem('dartbot_testmode', val ? '1' : '0'); } catch {}
+}
+function setVoice(val) {
+  voiceEnabled = val;
+  if (!val) cancelSpeech();
+  try { localStorage.setItem('dartbot_voice', val ? '1' : '0'); } catch {}
+}
+function setSfx(val) {
+  sfxEnabled = val;
+  try { localStorage.setItem('dartbot_sfx', val ? '1' : '0'); } catch {}
 }
 
 function buildCpuGrid(){
@@ -475,7 +486,7 @@ function launchLeg(){
   enterFullscreen();
   setTimeout(() => {
     updateScoreboard();
-    if (!testMode) speak(`${playerCallName(players[currentPlayer])}, you're up first`);
+    if (!testMode && voiceEnabled) speak(`${playerCallName(players[currentPlayer])}, you're up first`);
     startTurn();
   }, testMode ? 0 : 100);
 }
@@ -707,7 +718,7 @@ function advanceTurn(){
   round = Math.floor(turnsCompleted / players.length) + 1;
   currentPlayer = next;
   updateScoreboard();
-  setTimeout(() => { if (!testMode) speak(playerCallName(players[currentPlayer])); startTurn(); advancing = false; }, testMode ? 0 : 600);
+  setTimeout(() => { if (!testMode && voiceEnabled) speak(playerCallName(players[currentPlayer])); startTurn(); advancing = false; }, testMode ? 0 : 600);
 }
 
 function resetDartSlots(){
@@ -772,7 +783,7 @@ function registerDart(seg, coords = null){
   if(dartIsMiss || !isInPlay){
     currentDarts.push({score:0, label:'Miss', num:0, mul:0});
     updateDartSlot(dartIdx, 'Miss', 'miss');
-    if (!testMode) sfxMiss();
+    if (!testMode && sfxEnabled) sfxMiss();
   } else {
     const marks = Math.min(mul, 3);
     let marksToScore = 0;
@@ -819,30 +830,30 @@ function registerDart(seg, coords = null){
     const numWord = num === 25 ? 'Bull' : String(num);
 
     if(wasClosed && !scored){
-      if (!testMode) sfxMiss();
+      if (!testMode && sfxEnabled) sfxMiss();
     } else if(justClosedAll){
-      if (!testMode) sfxClose();
+      if (!testMode && sfxEnabled) sfxClose();
       flash('CLOSED!', 'var(--red)');
-      if (!testMode) speak(`Closed ${numWord}`);
+      if (!testMode && voiceEnabled) speak(`Closed ${numWord}`);
       showBroadcastEvent('close', 'CLOSED OUT', numWord, playerCallName(p));
     } else if(justClosed && scored > 0){
-      if (!testMode) sfxCloseAndScore();
+      if (!testMode && sfxEnabled) sfxCloseAndScore();
       flash(`OPENED ${numWord}`, 'var(--green)');
-      if (!testMode) speak(`Opened ${numWord}`);
+      if (!testMode && voiceEnabled) speak(`Opened ${numWord}`);
       showBroadcastEvent('open', 'OPENED', numWord, `+${scored}`);
     } else if(justClosed){
-      if (!testMode) sfxClose();
+      if (!testMode && sfxEnabled) sfxClose();
       flash(`OPENED ${numWord}`, 'var(--green)');
-      if (!testMode) speak(`Opened ${numWord}`);
+      if (!testMode && voiceEnabled) speak(`Opened ${numWord}`);
       showBroadcastEvent('open', 'OPENED', numWord, playerCallName(p));
     } else if(scored > 0){
-      if (!testMode) sfxScore();
+      if (!testMode && sfxEnabled) sfxScore();
       flash(`+${scored}`, 'var(--gold)');
-      if (!testMode) speak(dn);
+      if (!testMode && voiceEnabled) speak(dn);
       showBroadcastEvent('score', dartName(num, mul).toUpperCase(), String(scored), playerCallName(p) + ' · ' + p.score + ' pts');
     } else {
-      if (!testMode) sfxHit();
-      if (!testMode) speak(dn);
+      if (!testMode && sfxEnabled) sfxHit();
+      if (!testMode && voiceEnabled) speak(dn);
     }
 
     const cell = document.getElementById(`mcell-${num}-${currentPlayer}`);
@@ -868,7 +879,7 @@ function registerDart(seg, coords = null){
     const nextBtn = document.getElementById('next-player-btn');
     if(nextBtn && !p.isCpu) nextBtn.style.display = '';
     const turnScored = currentDarts.reduce((s, d) => s + (d.score || 0), 0);
-    if(turnScored > 0 && !testMode) setTimeout(() => speak(String(p.score)), 1200);
+    if(turnScored > 0 && !testMode && voiceEnabled) setTimeout(() => speak(String(p.score)), 1200);
   }
 }
 
@@ -1162,8 +1173,8 @@ function stopWinMusic() {
 async function endWithWinner(idx){
   gameActive = false;
   const winner = players[idx];
-  if (!testMode) playWinMusic();
-  if (!testMode) speak(`${playerCallName(winner)} wins!`, true);
+  if (!testMode && sfxEnabled) playWinMusic();
+  if (!testMode && voiceEnabled) speak(`${playerCallName(winner)} wins!`, true);
   const mprOf = p => p.dartsThrown >= 3
     ? (p.marksThrown / (p.dartsThrown / 3)).toFixed(2)
     : '0.00';
@@ -1347,6 +1358,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const cb = document.getElementById('test-mode-toggle');
     if (cb) cb.checked = true;
   }
+  voiceEnabled = localStorage.getItem('dartbot_voice') !== '0';
+  sfxEnabled   = localStorage.getItem('dartbot_sfx')   !== '0';
+  const vcb = document.getElementById('voice-toggle');
+  const scb = document.getElementById('sfx-toggle');
+  if (vcb) vcb.checked = voiceEnabled;
+  if (scb) scb.checked = sfxEnabled;
   initNeonDB();
   buildCpuGrid();
   renderRecentPlayers();
