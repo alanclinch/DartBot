@@ -240,7 +240,7 @@ body {
 }
 .setting-action-btn {
   background: none; border: none;
-  color: var(--muted); opacity: .5;
+  color: var(--white); opacity: .75;
   font-family: 'Exo 2', sans-serif; font-size: 13px; letter-spacing: 1px;
   cursor: pointer; padding: 4px 0;
   transition: opacity .15s, color .15s;

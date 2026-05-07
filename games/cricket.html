@@ -151,6 +151,10 @@
       <div class="ws-dot" id="game-ws-dot"></div>
       <div class="ws-label" id="game-ws-label">Not Connected</div>
     </div>
+    <div style="display:flex;gap:6px;">
+      <button class="end-btn" onclick="autodartsReset()" style="flex:1;font-size:11px;border-color:var(--muted);color:var(--muted);">RESET</button>
+      <button class="end-btn" onclick="autodartsCalibrate()" style="flex:1;font-size:11px;border-color:var(--muted);color:var(--muted);">CALIBRATE</button>
+    </div>
     <button class="end-btn" id="next-player-btn" onclick="advanceTurn()" style="display:none; border-color:var(--green); color:var(--green);">NEXT PLAYER →</button>
     <button class="end-btn" onclick="showLog()" style="margin-bottom:8px; border-color:var(--amber); color:var(--amber);">Show Throw Log</button>
     <button class="end-btn" onclick="endGame()">End Game</button>

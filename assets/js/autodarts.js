@@ -38,3 +38,11 @@ function updateWSUI(on) {
   const gl = document.getElementById('game-ws-label');
   if (gl) gl.textContent = on ? 'Autodarts Live' : 'Manual Mode';
 }
+
+function autodartsReset() {
+  fetch('http://localhost:3181/api/reset', { method: 'POST' }).catch(() => {});
+}
+
+function autodartsCalibrate() {
+  fetch('http://localhost:3181/api/config/calibration/auto', { method: 'POST' }).catch(() => {});
+}

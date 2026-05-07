@@ -223,6 +223,7 @@ let throwLog = [];
 let startingPlayer = 0;
 let legNumber = 0;
 let advancing = false;
+let takeoutTimer = null;
 let gameSession = null; // { playerKeys: string, wins: {[name]: number} }
 
 async function flushThrowsToNeon() {
@@ -462,6 +463,7 @@ function startGame(){
 
 function launchLeg(){
   if (window._cpuAutoTimer) { clearInterval(window._cpuAutoTimer); window._cpuAutoTimer = null; }
+  if (takeoutTimer) { clearTimeout(takeoutTimer); takeoutTimer = null; }
   cancelSpeech();
   document.getElementById('confetti').innerHTML = '';
   players.forEach(p => {
@@ -713,6 +715,7 @@ function startTurn(){
 function advanceTurn(){
   if(!gameActive || advancing) return;
   advancing = true;
+  if(takeoutTimer){ clearTimeout(takeoutTimer); takeoutTimer = null; }
   if(missTimer){ clearTimeout(missTimer); missTimer = null; }
   let next = (currentPlayer + 1) % players.length;
   turnsCompleted++;
@@ -886,6 +889,12 @@ function registerDart(seg, coords = null){
     if(nextBtn && !p.isCpu) nextBtn.style.display = '';
     const turnScored = currentDarts.reduce((s, d) => s + (d.score || 0), 0);
     if(turnScored > 0 && !testMode && voiceEnabled) setTimeout(() => speak(String(p.score)), 1200);
+    if(!p.isCpu && !testMode){
+      takeoutTimer = setTimeout(() => {
+        takeoutTimer = null;
+        if(gameActive && turnEnded && !advancing){ advanceTurn(); autodartsReset(); }
+      }, 10000);
+    }
   }
 }
 
