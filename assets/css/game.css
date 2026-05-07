@@ -5,12 +5,12 @@
 
 /* ── THEME ────────────────────────────────────────────────── */
 :root {
-  --bg:#0e1e38;
-  --bg2:#122540;
-  --surface:#1a3052;
-  --surface2:#1f3a62;
-  --border:#2c4d72;
-  --border2:#3a618e;
+  --bg:#172c4e;
+  --bg2:#1b3356;
+  --surface:#213c66;
+  --surface2:#274574;
+  --border:#345878;
+  --border2:#426892;
   --gold:#fcd34d;
   --gold-dim:#b45309;
   --text:#ffffff;
@@ -30,8 +30,8 @@
 body {
   background: var(--bg);
   background-image:
-    radial-gradient(ellipse at 15% 10%, rgba(40,100,220,.22) 0%, transparent 50%),
-    radial-gradient(ellipse at 85% 90%, rgba(20,70,180,.18) 0%, transparent 50%);
+    radial-gradient(ellipse at 8% 45%, rgba(75,45,165,.28) 0%, transparent 52%),
+    radial-gradient(ellipse at 88% 55%, rgba(20,75,215,.22) 0%, transparent 52%);
   color: var(--text);
   font-family: 'Exo 2', sans-serif;
   height: 100vh;

@@ -131,8 +131,14 @@ function setVoice(name) {
 }
 
 // priority=true clears queue first (use for bust, checkout, announcements)
+// non-priority capped at 2 pending — drops oldest if backed up so caller stays current
 function speak(text, priority = false) {
-  if (priority) _speechQueue = [text]; else _speechQueue.push(text);
+  if (priority) {
+    _speechQueue = [text];
+  } else {
+    _speechQueue.push(text);
+    if (_speechQueue.length > 2) _speechQueue.shift();
+  }
   _doSpeak();
 }
 

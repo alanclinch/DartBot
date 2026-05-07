@@ -563,11 +563,11 @@ function buildScoreboard(){
     row.style.gridTemplateColumns = colTemplate;
     const numCellContent = num === 25
       ? `<svg viewBox="0 0 60 60" class="bull-svg" xmlns="http://www.w3.org/2000/svg">
-           <circle cx="30" cy="30" r="29" fill="#0a1a0a"/>
-           <circle cx="30" cy="30" r="21" fill="#7a0000"/>
-           <circle cx="30" cy="30" r="13" fill="#1a6b1a"/>
-           <circle cx="30" cy="30" r="7" fill="#bb0000"/>
-           <circle cx="30" cy="30" r="3.5" fill="#ff2020"/>
+           <circle cx="30" cy="30" r="29" fill="#181818" stroke="#555" stroke-width="1.5"/>
+           <circle cx="30" cy="30" r="22" fill="#c81818" stroke="#333" stroke-width="1"/>
+           <circle cx="30" cy="30" r="14" fill="#1a9e1a" stroke="#333" stroke-width="1"/>
+           <circle cx="30" cy="30" r="8"  fill="#e02828" stroke="#333" stroke-width="1"/>
+           <circle cx="30" cy="30" r="4"  fill="#ff4040"/>
          </svg>`
       : num;
     const numCell = `<div class="sb-num-cell" id="numcell-${num}" style="font-size:${numFontSize}">${numCellContent}</div>`;
@@ -719,7 +719,14 @@ function advanceTurn(){
   round = Math.floor(turnsCompleted / players.length) + 1;
   currentPlayer = next;
   updateScoreboard();
-  setTimeout(() => { if (!testMode && voiceEnabled) speak(playerCallName(players[currentPlayer])); startTurn(); advancing = false; }, testMode ? 0 : 600);
+  setTimeout(() => {
+    const next = players[currentPlayer];
+    if (!testMode) {
+      if (next.isCpu) { if (sfxEnabled) sfxCpuTurn(); }
+      else { if (voiceEnabled) speak(playerCallName(next)); }
+    }
+    startTurn(); advancing = false;
+  }, testMode ? 0 : 600);
 }
 
 function resetDartSlots(){
@@ -850,11 +857,9 @@ function registerDart(seg, coords = null){
     } else if(scored > 0){
       if (!testMode && sfxEnabled) sfxScore();
       flash(`+${scored}`, 'var(--gold)');
-      if (!testMode && voiceEnabled) speak(dn);
       showBroadcastEvent('score', dartName(num, mul).toUpperCase(), String(scored), playerCallName(p) + ' · ' + p.score + ' pts');
     } else {
       if (!testMode && sfxEnabled) sfxHit();
-      if (!testMode && voiceEnabled) speak(dn);
     }
 
     const cell = document.getElementById(`mcell-${num}-${currentPlayer}`);
@@ -1287,6 +1292,12 @@ function sfxDeadDart(){
   const ctx=gAC(),t=ctx.currentTime;
   tone(220,'sawtooth',t,.12,.1,ctx);
   noiz(t,.08,.06,200,ctx);
+}
+function sfxCpuTurn(){
+  const ctx=gAC(),t=ctx.currentTime;
+  tone(440,'triangle',t,.06,.12,ctx);
+  tone(330,'triangle',t+.07,.10,.10,ctx);
+  noiz(t+.04,.08,.04,800,ctx);
 }
 function flash(text, color = 'var(--gold)') {
   const el = document.getElementById('announce');
