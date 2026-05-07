@@ -997,16 +997,15 @@ function getAdaptiveSigmaMul(p){
 }
 
 // ── Mark Control ─────────────────────────────────────────────
-// Rejection-sampling ceiling that prevents CPU from running above
-// its rated MPR for sustained stretches. Returns null in round 1
-// (accept any result) and tightens the ceiling in long games.
-// Only active in games that include a human player.
+// Rejection-sampling band that keeps CPU close to rated MPR —
+// ceiling prevents over-performance, floor prevents under-performance.
+// Returns null in round 1. Only active in games with a human player.
 function getMarkControlRange(r, t) {
   if (r <= 1) return null;
   const s = t / 0.9;
-  if (r <= 15) return { lo: 0, hi: 1.20 * s };
-  if (r <= 24) return { lo: 0, hi: 1.00 * s };
-               return { lo: 0, hi: 0.95 * s };
+  if (r <= 15) return { lo: 0.85 * s, hi: 1.20 * s };
+  if (r <= 24) return { lo: 0.90 * s, hi: 1.05 * s };
+               return { lo: 0.92 * s, hi: 1.00 * s };
 }
 
 function runCpuTurn(){
