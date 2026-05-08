@@ -888,6 +888,8 @@ function startGame() {
   document.documentElement.requestFullscreen().catch(() => {});
   showScreen('game');
   buildTowers();
+  document.querySelectorAll('.dc').forEach(c=>{c.textContent='—';c.className='dc';});
+  document.getElementById('last-dart-val').textContent='—';
   highlightActive();
   updatePanel();
   callPlayerName(players[cp]);
@@ -1473,10 +1475,9 @@ function hideBonusWarning() {
 function handleCheckout(idx) {
   const p=players[idx]; p.checkedOut=true; checkedOut.push(idx); roundCheckedOut.push(idx);
   turnEnded=true; gameActive=false; clearTurnTimers();
-  sfxCheckout();
   showOverlay(idx,'checkout'); spawnConfetti();
   const sc=document.getElementById('ts-'+idx);if(sc)sc.className='tower-score checkout';
-  setTimeout(()=>showWin(p), 2000);
+  setTimeout(()=>showWin(p), 400);
 }
 
 function advanceTurn() {
@@ -1489,6 +1490,9 @@ function advanceTurn() {
   const rem=players.filter(p=>!p.checkedOut);
   if(!rem.length)return;
   if(rem.length===1&&players.length>1){setTimeout(()=>showWin(players[checkedOut[0]]),600);return;}
+  const prevPlayer = players[cp];
+  const scoredThisTurn = prevPlayer.turnStart - prevPlayer.score;
+  if (scoredThisTurn > 0) setTimeout(() => speak(String(prevPlayer.score)), 1200);
   let next=(cp+1)%players.length,loops=0;
   while(players[next].checkedOut&&loops<players.length){next=(next+1)%players.length;loops++;}
   if(next<=cp){
@@ -1602,8 +1606,8 @@ function resolveSD() {
   const max=Math.max(...sdPlayers.map(p=>sdThrows[p.id]||0));
   const winners=sdPlayers.filter(p=>(sdThrows[p.id]||0)===max);
   if(winners.length>1){sdThrows={};sdIdx=0;setTimeout(()=>activateSD(0),2000);return;}
-  sdActive=false; sfxCheckout();
-  setTimeout(()=>showWin(winners[0]),1500);
+  sdActive=false;
+  setTimeout(()=>showWin(winners[0]),400);
 }
 
 // ══ WS ══
@@ -1731,7 +1735,7 @@ function stopCpuAuto() {
 }
 
 function skipTurn(){turnEnded=true;advanceTurn();}
-function quitGame(){if(confirm('Quit game?')){stopWinMusic();clearTurnTimers();gameActive=false;sdActive=false;turnToken++;showScreen('setup');}}
+function quitGame(){if(confirm('Quit game?')){stopWinMusic();clearTurnTimers();gameActive=false;sdActive=false;turnToken++;window.location.href='../index.html';}}
 function nextLeg() {
   if (window._cpuAutoTimer) { clearInterval(window._cpuAutoTimer); window._cpuAutoTimer = null; }
   stopWinMusic();
