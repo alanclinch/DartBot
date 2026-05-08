@@ -200,7 +200,8 @@ const NUMBERS = [20,19,18,17,16,15,25];
 const VARIANTS = {
   standard:  'Close 20→15 & Bull. Score points on open numbers. Close all + highest score wins.',
   cutthroat: 'Opponents gain points when you hit their open numbers. Fewest points + all closed wins.',
-  noscore:   'No points. First player to close all numbers wins.'
+  noscore:   'No points. First player to close all numbers wins.',
+  arcade:    'Solo! Race the CPU to close all 7 numbers. One hit closes instantly. Score with doubles & trebles!'
 };
 
 let testMode = false;
@@ -222,6 +223,9 @@ let pendingThrowsToSave = [];
 let throwLog = [];
 let startingPlayer = 0;
 let legNumber = 0;
+let arcadeScore = 0;
+let arcadeWave = 0;
+let arcadeContinueUsed = false;
 let advancing = false;
 let takeoutTimer = null;
 let gameSession = null; // { playerKeys: string, wins: {[name]: number} }
@@ -305,6 +309,11 @@ function selectVariant(v, btn){
   btn.classList.add('sel');
   document.getElementById('variant-desc').textContent = VARIANTS[v];
   document.getElementById('game-variant-badge').textContent = v.toUpperCase();
+  if (v === 'arcade') {
+    players = players.filter(p => !p.isCpu);
+    renderPlayerList();
+  }
+  checkStartBtn();
 }
 
 function setTestMode(val) {
@@ -336,7 +345,7 @@ function buildCpuGrid(){
 }
 
 function openCpuModal(){
-  if(players.length >= 4) return;
+  if(players.length >= 4 || gameVariant === 'arcade') return;
   document.getElementById('cpu-modal').classList.add('open');
 }
 function closeCpuModal(){
@@ -396,8 +405,9 @@ function renderPlayerList(){
   if(list1) list1.innerHTML = html;
   if(list2) list2.innerHTML = html;
   const maxed = players.length >= 4;
-  document.querySelectorAll('.add-human-btn').forEach(b => b.disabled = maxed);
-  document.querySelectorAll('.add-cpu-btn').forEach(b => b.disabled = maxed);
+  const arcadeHuman = gameVariant === 'arcade' && players.filter(p => !p.isCpu).length >= 1;
+  document.querySelectorAll('.add-human-btn').forEach(b => b.disabled = maxed || arcadeHuman);
+  document.querySelectorAll('.add-cpu-btn').forEach(b => b.disabled = maxed || gameVariant === 'arcade');
   renderRecentPlayers();
 }
 
@@ -438,7 +448,7 @@ function addSavedPlayer(name, flag = 'sco'){
 }
 
 function checkStartBtn(){
-  const valid = players.length >= 2;
+  const valid = gameVariant === 'arcade' ? players.length >= 1 : players.length >= 2;
   const sb = document.getElementById('start-btn');
   if(sb) sb.disabled = !valid;
   const nb = document.getElementById('next-leg-btn');
@@ -453,12 +463,31 @@ function getSessionKey(){
 }
 
 function startGame(){
-  if(players.length < 2) return;
+  if(gameVariant === 'arcade' ? players.length < 1 : players.length < 2) return;
   gameSession = null;
   legNumber = 0;
-  startingPlayer = Math.floor(Math.random() * players.length);
+  if (gameVariant === 'arcade') {
+    arcadeScore = 0;
+    arcadeWave = 0;
+    arcadeContinueUsed = false;
+    startingPlayer = 0;
+  } else {
+    startingPlayer = Math.floor(Math.random() * players.length);
+  }
   document.documentElement.requestFullscreen().catch(() => {});
   launchLeg();
+}
+
+function _arcadeSetupCpu() {
+  players = players.filter(p => !p.isCpu);
+  const cpuIdx = Math.min(arcadeWave, CPU_PLAYERS.length - 1);
+  const cpu = CPU_PLAYERS[cpuIdx];
+  players.push({
+    name: cpu.name, color: PLAYER_COLORS[1], flag: cpu.flag,
+    isCpu: true, cpuData: cpu, score: 0,
+    marks: {20:0,19:0,18:0,17:0,16:0,15:0,25:0},
+    dartsThrown: 0, marksThrown: 0, cpuMissStreak: 0
+  });
 }
 
 function launchLeg(){
@@ -466,6 +495,10 @@ function launchLeg(){
   if (takeoutTimer) { clearTimeout(takeoutTimer); takeoutTimer = null; }
   cancelSpeech();
   document.getElementById('confetti').innerHTML = '';
+  if (gameVariant === 'arcade') {
+    _arcadeSetupCpu();
+    startingPlayer = 0;
+  }
   players.forEach(p => {
     p.score = 0;
     p.marks = {20:0,19:0,18:0,17:0,16:0,15:0,25:0};
@@ -612,7 +645,7 @@ function updateScoreboard(){
     NUMBERS.forEach(num => {
       const marks = p.marks[num];
       const allClosedNum = players.every(op => op.marks[num] >= 3);
-      const canScore = marks >= 3 && !allClosedNum && gameVariant !== 'noscore';
+      const canScore = marks >= 3 && !allClosedNum && gameVariant !== 'noscore' && gameVariant !== 'arcade';
       const markEl = document.getElementById(`marksvg-${num}-${i}`);
       if(markEl) markEl.innerHTML = drawMarkSVG(marks, canScore);
       const cl = document.getElementById(`closedline-${num}-${i}`);
@@ -657,6 +690,9 @@ function updateScoreboard(){
 
   // Round
   document.getElementById('round-num').textContent = round;
+
+  // Arcade display
+  updateArcadeDisplay();
 }
 
 function drawMarkSVG(marks, canScore = false){
@@ -795,6 +831,32 @@ function registerDart(seg, coords = null){
     currentDarts.push({score:0, label:'Miss', num:0, mul:0});
     updateDartSlot(dartIdx, 'Miss', 'miss');
     if (!testMode && sfxEnabled) sfxMiss();
+  } else if (gameVariant === 'arcade') {
+    const currentMarks = p.marks[num];
+    const label = num===25?(mul===2?'Bullseye':'Bull'):(mul===3?`T${num}`:mul===2?`D${num}`:`${num}`);
+    if (currentMarks < 3) {
+      p.marks[num] = 3;
+      p.marksThrown += mul;
+      if (!p.isCpu) {
+        arcadeScore += mul;
+        updateArcadeDisplay();
+        flash(label, 'var(--green)');
+        showBroadcastEvent('open', 'CLOSED', num===25?'Bull':String(num), `+${mul} pts`);
+      }
+      if (!testMode && sfxEnabled) sfxClose();
+      currentDarts.push({score: mul, label, num, mul});
+      updateDartSlot(dartIdx, label, 'scored');
+      if(checkWin(currentPlayer)){
+        updateScoreboard();
+        turnEnded = true;
+        endWithWinner(currentPlayer);
+        return;
+      }
+    } else {
+      if (!testMode && sfxEnabled) sfxMiss();
+      currentDarts.push({score:0, label, num, mul});
+      updateDartSlot(dartIdx, label, 'hit');
+    }
   } else {
     const marks = Math.min(mul, 3);
     let marksToScore = 0;
@@ -1028,7 +1090,7 @@ function runCpuTurn(){
   const sigmaMultiplier = getAdaptiveSigmaMul(p);
 
   const hasHuman = players.some(q => !q.isCpu);
-  const mprRange = (hasHuman || testMode) ? getMarkControlRange(round, cpu, p) : null;
+  const mprRange = (hasHuman || testMode) && gameVariant !== 'arcade' ? getMarkControlRange(round, cpu, p) : null;
 
   // Mark Control: sample up to 25 three-dart combos, accept first that lands in the
   // per-turn marks band. Fall back to the closest attempt so there's never a
@@ -1135,7 +1197,7 @@ function checkWin(idx){
   const p = players[idx];
   const allClosed = NUMBERS.every(n => p.marks[n] >= 3);
   if(!allClosed) return false;
-  if(gameVariant === 'noscore') return true;
+  if(gameVariant === 'noscore' || gameVariant === 'arcade') return true;
   if(gameVariant === 'cutthroat'){
     const lowestScore = Math.min(...players.map(op => op.score));
     return p.score <= lowestScore;
@@ -1202,6 +1264,14 @@ function stopWinMusic() {
 
 async function endWithWinner(idx){
   gameActive = false;
+  if (gameVariant === 'arcade') {
+    if (players[idx].isCpu) {
+      arcadeLose();
+    } else {
+      arcadeWaveWin();
+    }
+    return;
+  }
   const winner = players[idx];
   if (!testMode && sfxEnabled) playWinMusic();
   if (!testMode && voiceEnabled) speak(`${playerCallName(winner)} wins!`, true);
@@ -1285,6 +1355,113 @@ async function endWithWinner(idx){
       }
     }, 1000);
   }
+}
+
+// =============================================
+// ARCADE MODE
+// =============================================
+function updateArcadeDisplay() {
+  const infoEl = document.getElementById('arcade-info');
+  if (infoEl) infoEl.style.display = gameVariant === 'arcade' ? '' : 'none';
+  if (gameVariant !== 'arcade') return;
+  const waveEl = document.getElementById('arcade-wave-display');
+  const scoreEl = document.getElementById('arcade-score-display');
+  if (waveEl) waveEl.textContent = arcadeWave + 1;
+  if (scoreEl) scoreEl.textContent = arcadeScore;
+}
+
+function arcadeWaveWin() {
+  const bonus = (arcadeWave + 1) * 10;
+  arcadeScore += bonus;
+  if (!testMode && sfxEnabled) sfxCheckout();
+  flash(`WAVE ${arcadeWave + 1} CLEAR! +${bonus}`, 'var(--gold)');
+  showBroadcastEvent('score', `WAVE ${arcadeWave + 1} CLEAR!`, `+${bonus} bonus`, `Score: ${arcadeScore}`);
+  if (!testMode && voiceEnabled) speak(`Wave ${arcadeWave + 1} cleared!`, true);
+  arcadeWave++;
+  arcadeContinueUsed = false;
+  updateArcadeDisplay();
+  setTimeout(() => launchLeg(), testMode ? 50 : 3000);
+}
+
+function arcadeLose() {
+  const contEl = document.getElementById('arcade-continue-modal');
+  if (!arcadeContinueUsed && contEl) {
+    const contScore = document.getElementById('continue-score');
+    if (contScore) contScore.textContent = arcadeScore;
+    contEl.classList.add('open');
+  } else {
+    showArcadeGameOver();
+  }
+}
+
+function useContinue() {
+  arcadeContinueUsed = true;
+  document.getElementById('arcade-continue-modal').classList.remove('open');
+  launchLeg();
+}
+
+function declineContinue() {
+  document.getElementById('arcade-continue-modal').classList.remove('open');
+  showArcadeGameOver();
+}
+
+function showArcadeGameOver() {
+  exitFullscreen();
+  if (!testMode && sfxEnabled) sfxSD();
+  const human = players.find(p => !p.isCpu);
+  document.getElementById('arcade-gameover-name').textContent = human ? human.name : '—';
+  document.getElementById('arcade-final-score').textContent = arcadeScore;
+  document.getElementById('arcade-wave-reached').textContent = arcadeWave + 1;
+  showScreen('arcade-gameover');
+  saveArcadeScore();
+  loadArcadeLeaderboard();
+}
+
+function restartArcade() {
+  stopWinMusic();
+  arcadeScore = 0;
+  arcadeWave = 0;
+  arcadeContinueUsed = false;
+  launchLeg();
+}
+
+async function saveArcadeScore() {
+  if (!sql) return;
+  const human = players.find(p => !p.isCpu);
+  if (!human) return;
+  try {
+    await sql`CREATE TABLE IF NOT EXISTS arcade_leaderboard (
+      id SERIAL PRIMARY KEY,
+      player_name TEXT NOT NULL,
+      score INT NOT NULL,
+      waves_cleared INT NOT NULL DEFAULT 0,
+      played_at TIMESTAMPTZ DEFAULT NOW()
+    )`;
+    await sql`INSERT INTO arcade_leaderboard (player_name, score, waves_cleared)
+      VALUES (${human.name}, ${arcadeScore}, ${arcadeWave})`;
+  } catch(e) { console.error('Arcade save error:', e); }
+}
+
+async function loadArcadeLeaderboard() {
+  const el = document.getElementById('arcade-leaderboard');
+  if (!el) return;
+  if (!sql) {
+    el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:16px;font-family:\'Share Tech Mono\',monospace;">Connect Neon DB for leaderboard</div>';
+    return;
+  }
+  el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:12px;">Loading…</div>';
+  try {
+    const rows = await sql`SELECT player_name, score, waves_cleared FROM arcade_leaderboard ORDER BY score DESC LIMIT 10`;
+    el.innerHTML = '<h3 style="color:var(--blue);font-family:\'Orbitron\',monospace;text-align:center;margin:0 0 12px;font-size:16px;letter-spacing:2px;">LEADERBOARD</h3>' +
+      (rows.length ? rows.map((r, i) => `
+        <div style="display:flex;align-items:center;gap:12px;padding:8px 16px;background:var(--bg2);border-radius:8px;margin-bottom:6px;">
+          <span style="color:var(--muted);font-family:'Orbitron',monospace;font-size:16px;min-width:24px;">${i+1}</span>
+          <span style="flex:1;color:var(--fg);font-family:'Exo 2',sans-serif;font-size:15px;">${escapeHTML(r.player_name)}</span>
+          <span style="color:var(--muted);font-size:12px;font-family:'Share Tech Mono',monospace;">Wave ${Number(r.waves_cleared)+1}</span>
+          <span style="color:var(--gold);font-family:'Orbitron',monospace;font-size:18px;">${r.score}</span>
+        </div>
+      `).join('') : '<div style="color:var(--muted);text-align:center;padding:16px;font-family:\'Share Tech Mono\',monospace;">No scores yet</div>');
+  } catch(e) { el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:16px;">Could not load leaderboard</div>'; }
 }
 
 function endGame(){
