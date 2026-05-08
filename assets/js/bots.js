@@ -17,7 +17,7 @@
 // Consistent across all DartBot games.
 const CPU_PLAYERS = [
   { id:'cpu0', name:'Jocky Wilson',       mpr:0.5, flag:'sco'},
-  { id:'cpu1', name:'John Lowe',          mpr:1.1, flag:'eng'},
+  { id:'cpu1', name:'John Lowe',          mpr:0.9, flag:'eng'},
   { id:'cpu2', name:'Eric Bristow',       mpr:1.3, flag:'eng'},
   { id:'cpu3', name:'Peter Wright',       mpr:1.8, flag:'sco'},
   { id:'cpu4', name:'Gary Anderson',      mpr:2.4, flag:'sco'},

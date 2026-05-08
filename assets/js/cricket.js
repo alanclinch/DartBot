@@ -1007,7 +1007,7 @@ function getMarkControlRange(round, cpu, p) {
   const target = cpu.mpr;
   const actual = p.marksThrown / (p.dartsThrown / 3);
   const dev = actual - target;
-  const scale = round <= 8 ? 2.0 : round <= 20 ? 1.5 : 1.2;
+  const scale = round <= 8 ? 1.2 : round <= 20 ? 0.9 : 0.7;
   // Cap each correction term to ±scale so lo/hi can't go out of reach
   const upCorr   = Math.min(scale, Math.max(0, -dev) * 1.5); // raises floor when below target
   const downCorr = Math.min(scale, Math.max(0, dev)  * 1.0); // drops ceiling when above target
