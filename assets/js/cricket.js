@@ -997,15 +997,25 @@ function getAdaptiveSigmaMul(p){
 }
 
 // ── Mark Control ─────────────────────────────────────────────
-// Rejection-sampling band that keeps CPU close to rated MPR —
-// ceiling prevents over-performance, floor prevents under-performance.
-// Returns null in round 1. Only active in games with a human player.
-function getMarkControlRange(r, t) {
-  if (r <= 1) return null;
-  const s = t / 0.9;
-  if (r <= 15) return { lo: 0.85 * s, hi: 1.20 * s };
-  if (r <= 24) return { lo: 0.90 * s, hi: 1.05 * s };
-               return { lo: 0.92 * s, hi: 1.00 * s };
+// Returns a per-turn marks band [lo, hi] that keeps the CPU close to
+// their rated MPR. Works on marks-this-turn (0–9) rather than cumulative
+// projected MPR. Correction is capped at ±scale so extreme deviation
+// can never push lo/hi outside a physically achievable range.
+// Only active in games with a human player.
+function getMarkControlRange(round, cpu, p) {
+  if (round <= 1 || p.dartsThrown < 3) return null;
+  const target = cpu.mpr;
+  const actual = p.marksThrown / (p.dartsThrown / 3);
+  const dev = actual - target;
+  const scale = round <= 8 ? 2.0 : round <= 20 ? 1.5 : 1.2;
+  // Cap each correction term to ±scale so lo/hi can't go out of reach
+  const upCorr   = Math.min(scale, Math.max(0, -dev) * 1.5); // raises floor when below target
+  const downCorr = Math.min(scale, Math.max(0, dev)  * 1.0); // drops ceiling when above target
+  const lo = Math.max(0, target - scale + upCorr);
+  const hi = target + scale - downCorr;
+  const loInt = Math.ceil(lo);
+  const hiInt = Math.max(loInt + 1, Math.min(9, Math.floor(hi)));
+  return { lo: loInt, hi: hiInt };
 }
 
 function runCpuTurn(){
@@ -1018,18 +1028,22 @@ function runCpuTurn(){
   const sigmaMultiplier = getAdaptiveSigmaMul(p);
 
   const hasHuman = players.some(q => !q.isCpu);
-  const mprRange = hasHuman ? getMarkControlRange(round, cpu.mpr) : null;
+  const mprRange = hasHuman ? getMarkControlRange(round, cpu, p) : null;
 
-  // Mark Control: rejection-sample 3 darts to stay within rated MPR ceiling (human games only)
+  // Mark Control: sample up to 25 three-dart combos, accept first that lands in the
+  // per-turn marks band. Fall back to the closest attempt so there's never a
+  // zero-mark forced turn from a failed rejection sample.
   let accepted = null;
   if (mprRange) {
     const opts = { missStreak: p.cpuMissStreak, roundForm, dartsThrown: p.dartsThrown, sigmaMultiplier };
-    for (let attempt = 0; attempt < 100; attempt++) {
+    const mid = (mprRange.lo + mprRange.hi) / 2;
+    let bestSegs = null, bestDiff = Infinity;
+    for (let attempt = 0; attempt < 25; attempt++) {
       const segs = [];
       let simPrev = null;
       for (let d = 0; d < 3; d++) {
         const t = getBestTarget(p);
-        const s = generateCpuThrow(t, cpu.mpr, { ...opts, prevSeg: simPrev });
+        const s = generateCpuThrow(t, cpu.mpr, { ...opts, prevSeg: simPrev, cricketAim: true });
         segs.push(s);
         simPrev = s;
       }
@@ -1037,9 +1051,11 @@ function runCpuTurn(){
         if (!s || !CRICKET_SET.has(s.number)) return sum;
         return sum + s.multiplier;
       }, 0);
-      const projMpr = (p.marksThrown + newMarks) / ((p.dartsThrown + 3) / 3);
-      if (projMpr > mprRange.lo && projMpr <= mprRange.hi) { accepted = segs; break; }
+      const diff = Math.abs(newMarks - mid);
+      if (diff < bestDiff) { bestDiff = diff; bestSegs = segs; }
+      if (newMarks >= mprRange.lo && newMarks <= mprRange.hi) { accepted = segs; break; }
     }
+    if (!accepted) accepted = bestSegs;
   }
 
   let dartIdx = 0;
@@ -1050,7 +1066,7 @@ function runCpuTurn(){
     const seg = accepted ? accepted[dartIdx++]
       : generateCpuThrow(getBestTarget(p), cpu.mpr, {
           prevSeg, missStreak: p.cpuMissStreak, roundForm,
-          dartsThrown: p.dartsThrown, sigmaMultiplier
+          dartsThrown: p.dartsThrown, sigmaMultiplier, cricketAim: true
         });
     const hitCricket = seg && CRICKET_SET.has(seg.number);
     p.cpuMissStreak = hitCricket ? 0 : p.cpuMissStreak + 1;
@@ -1209,11 +1225,13 @@ async function endWithWinner(idx){
       <div class="win-other-score" style="font-size:13px;margin-top:4px;">${statsOf(p)}</div>
     </div>`)
     .join('');
-  await Promise.all(players.map((p, i) =>
-    savePlayerStat(p.name, p.flag, i === idx, p.marksThrown, p.dartsThrown, p.isCpu)
-  ));
-  await flushThrowsToNeon();
-  await saveGameToNeon(idx);
+  try {
+    await Promise.all(players.map((p, i) =>
+      savePlayerStat(p.name, p.flag, i === idx, p.marksThrown, p.dartsThrown, p.isCpu)
+    ));
+    await flushThrowsToNeon();
+    await saveGameToNeon(idx);
+  } catch(e) { console.error('Save error:', e); }
 
   // Session tracking
   const key = getSessionKey();

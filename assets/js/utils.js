@@ -48,7 +48,7 @@ function showScreen(id) {
 }
 
 // ── SPEECH SYNTHESIS ─────────────────────────────────────────
-let _callerVoice = null, _speechQueue = [], _isSpeaking = false;
+let _callerVoice = null, _speechQueue = [], _isSpeaking = false, _speakStart = 0;
 const SPEECH_LS_KEY = 'dartbot_voice';
 
 // Preference order for auto-selection (first match wins):
@@ -149,12 +149,22 @@ function cancelSpeech() {
 }
 
 function _doSpeak() {
-  // Safety: reset if synthesis finished without firing onend (common on page transitions)
+  // Chrome silently pauses synthesis — wake it up
+  if (window.speechSynthesis.paused) window.speechSynthesis.resume();
+
+  // Watchdog: if stuck speaking for >8s, onend likely never fired — force reset
+  if (_isSpeaking && Date.now() - _speakStart > 8000) {
+    _isSpeaking = false;
+    window.speechSynthesis.cancel();
+  }
+
+  // Safety: reset if synthesis finished without firing onend
   if (_isSpeaking && !window.speechSynthesis.speaking && !window.speechSynthesis.pending) {
     _isSpeaking = false;
   }
   if (_isSpeaking || !_speechQueue.length) return;
   _isSpeaking = true;
+  _speakStart = Date.now();
   const utt = new SpeechSynthesisUtterance(_speechQueue.shift());
   if (_callerVoice) utt.voice = _callerVoice;
   utt.rate = 1.25; utt.pitch = 1.0; utt.volume = 1.0;

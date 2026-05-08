@@ -17,7 +17,7 @@
 // Consistent across all DartBot games.
 const CPU_PLAYERS = [
   { id:'cpu0', name:'Jocky Wilson',       mpr:0.5, flag:'sco'},
-  { id:'cpu1', name:'John Lowe',          mpr:0.9, flag:'eng'},
+  { id:'cpu1', name:'John Lowe',          mpr:1.1, flag:'eng'},
   { id:'cpu2', name:'Eric Bristow',       mpr:1.3, flag:'eng'},
   { id:'cpu3', name:'Peter Wright',       mpr:1.8, flag:'sco'},
   { id:'cpu4', name:'Gary Anderson',      mpr:2.4, flag:'sco'},
@@ -137,10 +137,17 @@ function generateCpuThrow(target, mpr, opts) {
   const sigmaR = Math.max(8, Math.min(18, 11 + mpr * 1.5));
 
   // ── Aim point ────────────────────────────────────────────────
-  // Centre of the single outer bed: 134.5mm (midpoint of 107mm treble edge → 162mm double edge).
+  // Cricket: blend aim from single outer (134.5mm) at low MPR to treble centre (103.5mm) at
+  // high MPR. Weak players land anywhere on the board; strong players target trebles.
+  // X01 / default: always single outer (134.5mm).
   let aimR = 0, aimTheta = 0;
   if (target !== 25) {
-    aimR = 134.5;
+    if (opts.cricketAim) {
+      const t = Math.max(0, Math.min(1, (mpr - 0.5) / 4.7));
+      aimR = 134.5 - 31 * t; // 134.5mm @ MPR 0.5 → 103.5mm @ MPR 5.2
+    } else {
+      aimR = 134.5;
+    }
     aimTheta = getSectorAngle(target);
   }
 
