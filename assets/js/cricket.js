@@ -782,7 +782,7 @@ function registerDart(seg, coords = null){
       isCpu: p.isCpu,
       targetMpr: p.isCpu ? p.cpuData.mpr : null
     };
-    if (!p.isCpu && coords) {
+    if (!p.isCpu && coords && !testMode) {
       pendingThrowsToSave.push(throwRecord);
     } else if (p.isCpu && !dartIsMiss) {
       pendingThrowsToSave.push(throwRecord);
@@ -1028,7 +1028,7 @@ function runCpuTurn(){
   const sigmaMultiplier = getAdaptiveSigmaMul(p);
 
   const hasHuman = players.some(q => !q.isCpu);
-  const mprRange = hasHuman ? getMarkControlRange(round, cpu, p) : null;
+  const mprRange = (hasHuman || testMode) ? getMarkControlRange(round, cpu, p) : null;
 
   // Mark Control: sample up to 25 three-dart combos, accept first that lands in the
   // per-turn marks band. Fall back to the closest attempt so there's never a
@@ -1226,9 +1226,10 @@ async function endWithWinner(idx){
     </div>`)
     .join('');
   try {
-    await Promise.all(players.map((p, i) =>
-      savePlayerStat(p.name, p.flag, i === idx, p.marksThrown, p.dartsThrown, p.isCpu)
-    ));
+    await Promise.all(players.map((p, i) => {
+      if (testMode && !p.isCpu) return Promise.resolve();
+      return savePlayerStat(p.name, p.flag, i === idx, p.marksThrown, p.dartsThrown, p.isCpu);
+    }));
     await flushThrowsToNeon();
     await saveGameToNeon(idx);
   } catch(e) { console.error('Save error:', e); }
@@ -1364,7 +1365,7 @@ function showBroadcastEvent(type, kicker, main, sub, duration) {
 document.addEventListener('keydown', e => {
   if(!gameActive || players[currentPlayer].isCpu) return;
   if(e.key===' '||e.key==='Enter'){
-    if(turnEnded||currentDarts.length>0) advanceTurn();
+    advanceTurn();
     return;
   }
   // FIX: removed unused numMap declaration that was here
