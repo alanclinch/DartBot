@@ -37,6 +37,10 @@ let startingPlayer = 0;
 let roundFirstPlayer = 0;
 let lastSpokenRound = 0;
 let firstTurnSpoken = false;
+let inDeadHeat = false;
+let deadHeatPlayers = [];
+let deadHeatIdx = 0;
+let deadHeatScores = {};
 let gameSession = null; // { playerKeys, wins: {name: count} }
 
 // =============================================
@@ -172,11 +176,30 @@ function scoreAttackPoints(seg, target) {
   const num = Number(seg.number);
   const mul = Number(seg.multiplier);
   if (num !== target) return 0;
-  if (target === 25) {
-    // Single Bull = 25 (mul=1), Double Bull = 50 (mul=2)
-    return 25 * (mul >= 1 ? mul : 1);
-  }
-  return num * mul;
+  if (target === 25) return mul === 2 ? 10 : 5; // bullseye=10, outer bull=5
+  if (mul === 3) return 3;
+  if (mul === 2) return 2;
+  return 1;
+}
+
+function deadHeatScore(seg) {
+  if (!seg || isMiss(seg)) return 0;
+  const num = Number(seg.number);
+  const mul = Number(seg.multiplier);
+  if (num === 0) return 0;
+  if (num === 25) return mul === 2 ? 10 : 5;
+  if (mul === 3) return 3;
+  if (mul === 2) return 2;
+  return 1;
+}
+
+function sfxForHit(seg) {
+  const mul = Number(seg.multiplier);
+  const num = Number(seg.number);
+  if (num === 25) { mul === 2 ? sfxTreble() : sfxDouble(); return; }
+  if (mul === 3) { sfxTreble(); return; }
+  if (mul === 2) { sfxDouble(); return; }
+  sfxHit();
 }
 function speakIf(t, p = false) { if (voiceEnabled) speak(t, p); }
 function sfxIf(fn) { if (sfxEnabled) fn(); }
@@ -393,6 +416,10 @@ function launchLeg() {
   lastSegByPlayer = {};
   lastSpokenRound = 0;
   firstTurnSpoken = false;
+  inDeadHeat = false;
+  deadHeatPlayers = [];
+  deadHeatIdx = 0;
+  deadHeatScores = {};
   stopWinMusic();
   document.getElementById('next-player-btn').style.display = 'none';
   buildBoard();
@@ -562,8 +589,9 @@ function beginTurn() {
     return;
   }
 
-  if (variant === 'scoreattack') {
-    // Set target for this round
+  if (inDeadHeat) {
+    p.target = 25; // CPU aims for bull in sudden death
+  } else if (variant === 'scoreattack') {
     p.target = TARGET_SEQ[round - 1];
   }
 
@@ -575,20 +603,24 @@ function beginTurn() {
   updateTargetDisplay();
   document.getElementById('next-player-btn').style.display = 'none';
 
-  // Speech: name on first turn, target number at start of each round
   if (!testMode) {
-    let nameDelay = 0;
-    if (!firstTurnSpoken && !p.isCpu) {
-      firstTurnSpoken = true;
-      if (voiceEnabled) speak(`${p.name}, you're up first`);
-      nameDelay = 1800;
-    }
-    if (round > lastSpokenRound) {
-      lastSpokenRound = round;
-      if (voiceEnabled) {
+    if (inDeadHeat) {
+      if (deadHeatIdx === 0 && voiceEnabled) speak('Sudden death!', true);
+    } else {
+      let nameDelay = 0;
+      if (!firstTurnSpoken && !p.isCpu) {
+        firstTurnSpoken = true;
+        if (voiceEnabled) speak(`${p.name}, you're up first`);
+        nameDelay = 1800;
+      }
+      if (round > lastSpokenRound) {
+        lastSpokenRound = round;
         const tgt = TARGET_SEQ[round - 1];
-        const numStr = tgt === 25 ? 'Bull' : `Number ${tgt}`;
-        setTimeout(() => speak(numStr), nameDelay > 0 ? nameDelay : 500);
+        const delay = nameDelay > 0 ? nameDelay : 500;
+        setTimeout(() => {
+          flashRoundNumber(tgt);
+          if (voiceEnabled) speak(tgt === 25 ? 'Bull' : `Number ${tgt}`);
+        }, delay);
       }
     }
   }
@@ -613,6 +645,11 @@ function updateTargetDisplay() {
   const p = players[currentPlayer];
   const targetEl = document.getElementById('target-val');
   if (!targetEl || !p) return;
+  if (inDeadHeat) {
+    targetEl.textContent = 'SD';
+    targetEl.classList.remove('bull');
+    return;
+  }
   const tgt = variant === 'scoreattack' ? TARGET_SEQ[round - 1] : p.target;
   if (tgt === 25) {
     targetEl.textContent = 'BULL';
@@ -635,6 +672,11 @@ function updateRound() {
 function advanceTurn() {
   if (winnerIdx >= 0) return;
   if (cpuTurnTimer) { clearTimeout(cpuTurnTimer); cpuTurnTimer = null; }
+
+  if (inDeadHeat) {
+    advanceDeadHeat();
+    return;
+  }
 
   if (variant === 'scoreattack') {
     advanceTurnScoreAttack();
@@ -678,14 +720,33 @@ function advanceTurnScoreAttack() {
 }
 
 function endScoreAttack() {
+  const bestScore = Math.max(...players.map(p => p.score));
+  const tiedIndices = players.map((p, i) => p.score === bestScore ? i : -1).filter(i => i >= 0);
+
+  if (tiedIndices.length > 1) {
+    // Dead heat — sudden death round
+    inDeadHeat = true;
+    deadHeatPlayers = tiedIndices;
+    deadHeatIdx = 0;
+    deadHeatScores = {};
+    tiedIndices.forEach(i => { deadHeatScores[i] = 0; });
+    gameActive = true;
+    currentPlayer = deadHeatPlayers[0];
+    currentDarts = [];
+    turnEnded = false;
+    if (sfxEnabled) sfxSD();
+    flash('DEAD HEAT!', 'var(--gold)');
+    setTimeout(() => beginTurn(), 1800);
+    return;
+  }
+
+  winnerIdx = tiedIndices[0];
   gameActive = false;
-  let bestScore = -1;
-  let bestIdx = 0;
-  players.forEach((p, i) => {
-    if (p.score > bestScore) { bestScore = p.score; bestIdx = i; }
-  });
-  winnerIdx = bestIdx;
-  setTimeout(() => goToWinner(), 800);
+  if (!testMode) {
+    if (sfxEnabled) sfxCheckout();
+    playWinMusic();
+  }
+  setTimeout(() => goToWinner(), 1200);
 }
 
 function resetDartSlots() {
@@ -714,7 +775,9 @@ function registerDart(seg) {
   if (variant === 'classic' && p.target === 0) return;
   saveState();
 
-  if (variant === 'scoreattack') {
+  if (inDeadHeat) {
+    registerDartDeadHeat(seg, p);
+  } else if (variant === 'scoreattack') {
     registerDartScoreAttack(seg, p);
   } else {
     registerDartClassic(seg, p);
@@ -788,20 +851,21 @@ function registerDartScoreAttack(seg, p) {
   fillDartSlot(currentDarts.length - 1, label, type);
 
   if (pts > 0) {
-    if (sfxEnabled) sfxHit();
+    if (sfxEnabled) sfxForHit(seg);
     flash('+' + pts, 'var(--green)');
-  } else if (isM) {
-    if (sfxEnabled) sfxMiss();
   } else {
     if (sfxEnabled) sfxMiss();
   }
 
   updatePlayerTile(currentPlayer, pts > 0);
 
-  // Always advance after 3 darts — no mid-game win
   if (currentDarts.length >= 3) {
     turnEnded = true;
-    if (!p.isCpu) {
+    const lastTurnOfGame = round === 21 && (currentPlayer + 1) % players.length === roundFirstPlayer;
+    if (lastTurnOfGame) {
+      // End game immediately — no NEXT PLAYER button
+      cpuTurnTimer = setTimeout(advanceTurnScoreAttack, p.isCpu ? 800 : 500);
+    } else if (!p.isCpu) {
       document.getElementById('next-player-btn').style.display = '';
     } else {
       cpuTurnTimer = setTimeout(advanceTurn, 1500);
@@ -809,6 +873,73 @@ function registerDartScoreAttack(seg, p) {
   } else if (p.isCpu) {
     cpuTurnTimer = setTimeout(runCpuTurn, 1100);
   }
+}
+
+// =============================================
+// DEAD HEAT
+// =============================================
+function registerDartDeadHeat(seg, p) {
+  const pts = deadHeatScore(seg);
+  const isM = isMiss(seg);
+  const label = isM ? 'MISS' : (seg.name || dartSpeak(seg));
+  const type = isM ? 'miss' : (pts > 0 ? 'scored' : 'hit');
+
+  p.dartsThrown++;
+  if (pts > 0) {
+    deadHeatScores[currentPlayer] = (deadHeatScores[currentPlayer] || 0) + pts;
+    p.score = (p.score || 0) + pts;
+    p.hits++;
+  }
+
+  currentDarts.push({ seg, label, type, pts });
+  fillDartSlot(currentDarts.length - 1, label, type);
+
+  if (pts > 0) {
+    if (sfxEnabled) sfxForHit(seg);
+    flash('+' + pts, 'var(--gold)');
+  } else {
+    if (sfxEnabled) sfxMiss();
+  }
+
+  updatePlayerTile(currentPlayer, pts > 0);
+
+  if (currentDarts.length >= 3) {
+    turnEnded = true;
+    const lastDeadHeat = deadHeatIdx >= deadHeatPlayers.length - 1;
+    if (lastDeadHeat) {
+      cpuTurnTimer = setTimeout(resolveDeadHeat, p.isCpu ? 800 : 500);
+    } else if (!p.isCpu) {
+      document.getElementById('next-player-btn').style.display = '';
+    } else {
+      cpuTurnTimer = setTimeout(advanceDeadHeat, 1500);
+    }
+  } else if (p.isCpu) {
+    cpuTurnTimer = setTimeout(runCpuTurn, 1100);
+  }
+}
+
+function advanceDeadHeat() {
+  if (cpuTurnTimer) { clearTimeout(cpuTurnTimer); cpuTurnTimer = null; }
+  deadHeatIdx++;
+  currentPlayer = deadHeatPlayers[deadHeatIdx];
+  currentDarts = [];
+  turnEnded = false;
+  if (sfxEnabled) sfxNext();
+  beginTurn();
+}
+
+function resolveDeadHeat() {
+  if (cpuTurnTimer) { clearTimeout(cpuTurnTimer); cpuTurnTimer = null; }
+  inDeadHeat = false;
+  const bestScore = Math.max(...deadHeatPlayers.map(i => deadHeatScores[i] || 0));
+  const winners = deadHeatPlayers.filter(i => (deadHeatScores[i] || 0) === bestScore);
+  winnerIdx = winners[0];
+  gameActive = false;
+  if (!testMode) {
+    if (sfxEnabled) sfxCheckout();
+    playWinMusic();
+  }
+  setTimeout(() => goToWinner(), 1200);
 }
 
 // =============================================
@@ -887,7 +1018,7 @@ function runCpuTurn() {
   if (!p || !p.isCpu) return;
   if (currentDarts.length >= 3) return;
   if (variant === 'classic' && p.target === 0) return;
-  const tgt = variant === 'scoreattack' ? TARGET_SEQ[round - 1] : p.target;
+  const tgt = inDeadHeat ? 25 : (variant === 'scoreattack' ? TARGET_SEQ[round - 1] : p.target);
   const opts = { prevSeg: lastSegByPlayer[currentPlayer] || null };
   const seg = generateCpuThrow(tgt, p.mpr, opts) || { name: 'M', number: 0, multiplier: 0 };
   lastSegByPlayer[currentPlayer] = seg;
@@ -936,9 +1067,11 @@ function goToWinner() {
   renderPlayerList();
   showScreen('winner');
   spawnConfetti();
-  playWinMusic();
+  if (!_winAudio) {
+    playWinMusic();
+    if (sfxEnabled) sfxCheckout();
+  }
   speakIf('Game shot! ' + winner.name + ' wins!', true);
-  if (sfxEnabled) sfxCheckout();
 
   const allCpu = players.every(p => p.isCpu);
   document.getElementById('cpu-auto-msg').style.display = allCpu ? '' : 'none';
@@ -977,6 +1110,20 @@ function goToMenu() {
 // =============================================
 // FLASH
 // =============================================
+function flashRoundNumber(tgt) {
+  const el = document.getElementById('round-flash');
+  if (!el) return;
+  const isBull = tgt === 25;
+  el.textContent = isBull ? 'BULL' : String(tgt);
+  el.style.color = isBull ? 'var(--gold)' : '#fff';
+  el.style.textShadow = isBull
+    ? '0 0 80px rgba(252,211,77,.7)'
+    : '0 0 80px rgba(96,165,250,.7)';
+  el.classList.remove('pop');
+  void el.offsetWidth;
+  el.classList.add('pop');
+}
+
 function flash(text, color = 'var(--gold)') {
   const el = document.getElementById('announce');
   if (!el) return;

@@ -234,11 +234,26 @@ function sfxMiss() {
   noiz(t, 0.12, 0.08, 180, ctx);
 }
 
-// Short positive tick for any scoring hit
+// Short positive tick for any scoring hit (single)
 function sfxHit() {
   const ctx = gAC(), t = ctx.currentTime;
   tone(660, 'sine', t, 0.08, 0.15, ctx);
   tone(880, 'sine', t + 0.06, 0.06, 0.08, ctx);
+}
+
+// Double hit — two ascending pings
+function sfxDouble() {
+  const ctx = gAC(), t = ctx.currentTime;
+  tone(880,  'sine', t,       0.10, 0.22, ctx);
+  tone(1100, 'sine', t + 0.09, 0.10, 0.25, ctx);
+}
+
+// Treble hit — three-note ascending celebration
+function sfxTreble() {
+  const ctx = gAC(), t = ctx.currentTime;
+  tone(880,  'sine', t,       0.08, 0.20, ctx);
+  tone(1100, 'sine', t + 0.08, 0.08, 0.22, ctx);
+  tone(1320, 'sine', t + 0.16, 0.12, 0.28, ctx);
 }
 
 // Two-beep warning (near checkout / low score)
