@@ -147,6 +147,12 @@ body{
 }
 .tower-name{font-size:clamp(10px,1.2vw,14px);letter-spacing:1px;color:var(--muted);opacity:.7;
   font-family:'Exo 2',sans-serif;font-weight:600;text-align:center;margin-top:2px;}
+.checkout-hint{flex-shrink:0;text-align:center;padding:5px 4px 2px;min-height:32px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;}
+.ch-label{font-family:'Share Tech Mono',monospace;font-size:clamp(7px,.65vw,10px);
+  letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.ch-combo{font-family:'Orbitron',monospace;font-size:clamp(8px,.85vw,12px);font-weight:700;
+  color:var(--green);letter-spacing:1px;text-shadow:0 0 8px rgba(52,211,153,.4);}
 .tower-svg-wrap{position:relative;flex:0 0 auto;display:flex;align-items:flex-start;
   justify-content:center;width:100%;overflow:visible;margin-top:auto;}
 .tower-svg-wrap svg{width:min(96%,300px);height:auto;display:block;}
@@ -989,7 +995,8 @@ function buildTowers() {
         <div class="tower-name">${escapeHTML(p.name)}</div>
         <div class="tower-ppr" id="tppr-${i}">PPR —</div>
       </div>
-      <div class="tower-svg-wrap" id="tsw-${i}">${svg}</div>`;
+      <div class="tower-svg-wrap" id="tsw-${i}">${svg}</div>
+      <div class="checkout-hint" id="ch-${i}"></div>`;
     area.appendChild(wrap);
     updateBuildingExtras(i);
   });
@@ -1011,7 +1018,7 @@ function registerDart(score, seg) {
   p.totalDartsThrown++;
   const isMissed = (score === null || score === 0);
   const s = isMissed ? 0 : score;
-  const display = isMissed ? 'Miss' : dartSpeak(seg);
+  const display = isMissed ? 'Miss' : (seg && seg.name ? seg.name : dartSpeak(seg));
   const bonusToResolve = activeBonus && activeBonus.playerIdx === cp && activeBonus.dartIdx === darts.length ? activeBonus : null;
   darts.push({score:s, display, isMissed});
   updateDartDisplay(s, display);
@@ -1678,6 +1685,55 @@ function handleWS(data){
   }
 }
 
+// ══ CHECKOUT HINT ══
+function oneDartLabel(n) {
+  if (n <= 0 || n > 60) return null;
+  if (n === 50) return 'Bull';
+  if (n === 25) return '25';
+  if (n >= 1 && n <= 20) return String(n);
+  if (n % 3 === 0 && n / 3 <= 20) return 'T' + (n / 3);
+  if (n % 2 === 0 && n / 2 <= 20) return 'D' + (n / 2);
+  return null;
+}
+function getCheckoutSuggestion(remaining, dartsLeft) {
+  if (remaining <= 0 || dartsLeft <= 0 || remaining > dartsLeft * 60) return null;
+  const d1 = oneDartLabel(remaining);
+  if (d1) return d1;
+  if (dartsLeft === 1) return null;
+  const highs = [
+    ['T20',60],['T19',57],['T18',54],['T17',51],['T16',48],
+    ['Bull',50],['T15',45],['T14',42],['T13',39],['T12',36],
+    ['T11',33],['T10',30],['D20',40],['D19',38],['D18',36],['D17',34],
+  ];
+  for (const [lbl, val] of highs) {
+    const r = remaining - val;
+    if (r > 0) { const d2 = oneDartLabel(r); if (d2) return lbl + ' + ' + d2; }
+  }
+  if (dartsLeft === 2) return null;
+  const highs3 = [['T20',60],['T19',57],['T18',54],['T17',51],['Bull',50]];
+  for (const [lbl1, val1] of highs3) {
+    const r1 = remaining - val1;
+    if (r1 <= 0) continue;
+    for (const [lbl2, val2] of highs) {
+      const r2 = r1 - val2;
+      if (r2 > 0 && r2 <= 60) { const d3 = oneDartLabel(r2); if (d3) return lbl1 + ' + ' + lbl2 + ' + ' + d3; }
+    }
+  }
+  return null;
+}
+function updateCheckoutHint() {
+  players.forEach((p, i) => {
+    const el = document.getElementById('ch-' + i);
+    if (!el) return;
+    el.innerHTML = '';
+    if (i !== cp || !gameActive || turnEnded || p.checkedOut) return;
+    const dartsLeft = 3 - darts.length;
+    const suggestion = getCheckoutSuggestion(p.score, dartsLeft);
+    if (!suggestion) return;
+    el.innerHTML = '<div class="ch-label">Close with</div><div class="ch-combo">' + suggestion + '</div>';
+  });
+}
+
 // ══ UI ══
 function updatePanel(){
   const p=players[cp];if(!p)return;
@@ -1686,6 +1742,7 @@ function updatePanel(){
   if(ts)ts.textContent=turnEnded?'Waiting...':(p.isCpu?'CPU thinking...':'Dart '+(darts.length+1)+' of 3');
   const nb=document.getElementById('next-player-btn');
   if(nb)nb.style.display=(turnEnded&&!p.isCpu&&gameActive)?'':'none';
+  updateCheckoutHint();
 }
 
 async function showWin(w) {

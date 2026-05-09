@@ -14,7 +14,7 @@ const LS_KEY = 'dartbot_atc_players';
 // STATE
 // =============================================
 let players = [];
-let variant = 'classic';
+let variant = 'scoreattack';
 let currentPlayer = 0;
 let currentDarts = [];
 let round = 1;
