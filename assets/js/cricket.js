@@ -520,11 +520,16 @@ function launchLeg(){
   buildScoreboard();
   showScreen('game');
   enterFullscreen();
-  setTimeout(() => {
+  if (gameVariant === 'arcade' && !testMode) {
     updateScoreboard();
-    if (!testMode && voiceEnabled) speak(`${playerCallName(players[currentPlayer])}, you're up first`);
-    startTurn();
-  }, testMode ? 0 : 100);
+    showArcadeRoundSplash(arcadeWave, () => { startTurn(); });
+  } else {
+    setTimeout(() => {
+      updateScoreboard();
+      if (!testMode && voiceEnabled) speak(`${playerCallName(players[currentPlayer])}, you're up first`);
+      startTurn();
+    }, testMode ? 0 : 100);
+  }
 }
 
 function nextLeg(){
@@ -631,13 +636,30 @@ function updateScoreboard(){
   players.forEach((p,i) => {
     const scoreEl = document.getElementById(`pscore-${i}`);
     if(scoreEl){
-      scoreEl.textContent = p.score;
-      scoreEl.classList.toggle('leading', p.score === maxScore && maxScore > 0);
+      if (gameVariant === 'arcade') {
+        if (p.isCpu) {
+          scoreEl.textContent = `${p.cpuData ? p.cpuData.mpr : '—'} MPR`;
+          scoreEl.classList.remove('leading');
+          scoreEl.style.fontSize = 'clamp(28px,4vw,52px)';
+        } else {
+          scoreEl.textContent = arcadeScore;
+          scoreEl.classList.toggle('leading', arcadeScore > 0);
+          scoreEl.style.fontSize = '';
+        }
+      } else {
+        scoreEl.textContent = p.score;
+        scoreEl.style.fontSize = '';
+        scoreEl.classList.toggle('leading', p.score === maxScore && maxScore > 0);
+      }
     }
     const mprEl = document.getElementById(`pmpr-${i}`);
     if(mprEl){
-      const mpr = p.dartsThrown >= 3 ? (p.marksThrown / (p.dartsThrown / 3)).toFixed(2) : '—';
-      mprEl.textContent = `MPR ${mpr}`;
+      if (gameVariant === 'arcade' && p.isCpu) {
+        mprEl.textContent = '';
+      } else {
+        const mpr = p.dartsThrown >= 3 ? (p.marksThrown / (p.dartsThrown / 3)).toFixed(2) : '—';
+        mprEl.textContent = `MPR ${mpr}`;
+      }
     }
     const hdrEl = document.getElementById(`phdr-${i}`);
     if(hdrEl) hdrEl.classList.toggle('active-col', i === currentPlayer);
@@ -762,7 +784,7 @@ function advanceTurn(){
     const next = players[currentPlayer];
     if (!testMode) {
       if (next.isCpu) { if (sfxEnabled) sfxCpuTurn(); }
-      else { if (voiceEnabled) speak(playerCallName(next)); }
+      else { if (voiceEnabled && gameVariant !== 'arcade') speak(playerCallName(next)); }
     }
     startTurn(); advancing = false;
   }, testMode ? 0 : 600);
@@ -950,7 +972,7 @@ function registerDart(seg, coords = null){
     const nextBtn = document.getElementById('next-player-btn');
     if(nextBtn && !p.isCpu) nextBtn.style.display = '';
     const turnScored = currentDarts.reduce((s, d) => s + (d.score || 0), 0);
-    if(turnScored > 0 && !testMode && voiceEnabled) setTimeout(() => speak(String(p.score)), 1200);
+    if(turnScored > 0 && !testMode && voiceEnabled && gameVariant !== 'arcade') setTimeout(() => speak(String(p.score)), 1200);
     if(!p.isCpu && !testMode){
       takeoutTimer = setTimeout(() => {
         takeoutTimer = null;
@@ -1374,13 +1396,28 @@ function arcadeWaveWin() {
   const bonus = (arcadeWave + 1) * 10;
   arcadeScore += bonus;
   if (!testMode && sfxEnabled) sfxCheckout();
+  spawnConfetti();
   flash(`WAVE ${arcadeWave + 1} CLEAR! +${bonus}`, 'var(--gold)');
   showBroadcastEvent('score', `WAVE ${arcadeWave + 1} CLEAR!`, `+${bonus} bonus`, `Score: ${arcadeScore}`);
-  if (!testMode && voiceEnabled) speak(`Wave ${arcadeWave + 1} cleared!`, true);
   arcadeWave++;
   arcadeContinueUsed = false;
   updateArcadeDisplay();
-  setTimeout(() => launchLeg(), testMode ? 50 : 3000);
+  setTimeout(() => launchLeg(), testMode ? 50 : 2800);
+}
+
+function showArcadeRoundSplash(wave, onDone) {
+  const splash = document.getElementById('arcade-round-splash');
+  const text = document.getElementById('arcade-round-text');
+  const vs = document.getElementById('arcade-round-vs');
+  if (!splash || testMode) { if (onDone) onDone(); return; }
+  const cpu = CPU_PLAYERS[Math.min(wave, CPU_PLAYERS.length - 1)];
+  text.textContent = `WAVE ${wave + 1}`;
+  vs.textContent = `vs ${cpu.name}`;
+  splash.classList.add('show');
+  setTimeout(() => {
+    splash.classList.remove('show');
+    if (onDone) onDone();
+  }, 2400);
 }
 
 function arcadeLose() {
