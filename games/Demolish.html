@@ -145,14 +145,14 @@ body{
   70%{opacity:1;transform:translate(-50%,-125%) scale(1);}
   100%{opacity:0;transform:translate(-50%,-155%) scale(.92);}
 }
-.tower-name{font-size:clamp(10px,1.2vw,14px);letter-spacing:1px;color:var(--muted);opacity:.7;
+.tower-name{font-size:clamp(12px,1.4vw,16px);letter-spacing:1px;color:#fff;opacity:.85;
   font-family:'Exo 2',sans-serif;font-weight:600;text-align:center;margin-top:2px;}
 .checkout-hint{flex-shrink:0;text-align:center;padding:5px 4px 2px;min-height:32px;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;}
-.ch-label{font-family:'Share Tech Mono',monospace;font-size:clamp(7px,.65vw,10px);
-  letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
-.ch-combo{font-family:'Orbitron',monospace;font-size:clamp(8px,.85vw,12px);font-weight:700;
-  color:var(--green);letter-spacing:1px;text-shadow:0 0 8px rgba(52,211,153,.4);}
+.ch-label{font-family:'Share Tech Mono',monospace;font-size:clamp(10px,1vw,14px);
+  letter-spacing:2px;text-transform:uppercase;color:var(--gold);opacity:.7;}
+.ch-combo{font-family:'Orbitron',monospace;font-size:clamp(12px,1.4vw,20px);font-weight:700;
+  color:var(--gold);letter-spacing:1px;text-shadow:0 0 10px rgba(252,211,77,.45);}
 .tower-svg-wrap{position:relative;flex:0 0 auto;display:flex;align-items:flex-start;
   justify-content:center;width:100%;overflow:visible;margin-top:auto;}
 .tower-svg-wrap svg{width:min(96%,300px);height:auto;display:block;}
@@ -291,8 +291,21 @@ body{
   transition:all .2s;letter-spacing:1px;
 }
 .end-btn:hover{border-color:var(--red);color:var(--red);}
-.tower-ppr{font-family:'Share Tech Mono',monospace;font-size:clamp(11px,1.1vw,13px);
-  color:#fff;opacity:.5;text-align:center;margin-top:2px;}
+.tower-ppr{font-family:'Share Tech Mono',monospace;font-size:clamp(12px,1.2vw,14px);
+  color:#fff;opacity:.75;text-align:center;margin-top:2px;}
+.keypad-wrap{display:flex;flex-direction:column;gap:4px;
+  background:var(--surface2);border:2px solid var(--border);border-radius:10px;padding:6px;}
+.keypad-row{display:flex;gap:4px;}
+.kp-btn{flex:1;padding:5px 0;background:var(--surface);
+  border:2px solid var(--border2);border-radius:6px;
+  color:var(--text);font-family:'Exo 2',sans-serif;
+  font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;}
+.kp-btn:hover{border-color:var(--blue);color:var(--blue);}
+.kp-miss{color:var(--muted);}
+.kp-miss:hover{border-color:var(--red);color:var(--red);}
+.kp-mod.active{background:var(--blue2);border-color:var(--blue);color:#fff;}
+.kp-undo{border-color:var(--amber);color:#fff;}
+.kp-undo:hover{background:rgba(251,191,36,.1);border-color:var(--amber);}
 
 /* ── SUDDEN DEATH ── */
 #sudden-death{flex-direction:column;align-items:center;justify-content:center;gap:20px;
@@ -479,11 +492,51 @@ body{
         <div class="last-dart-lbl">Score</div>
       </div>
     </div>
+    <div>
+      <div class="panel-label">Manual Input</div>
+      <div class="keypad-wrap">
+        <div class="keypad-row">
+          <button class="kp-btn" onclick="manualDart(1)">1</button>
+          <button class="kp-btn" onclick="manualDart(2)">2</button>
+          <button class="kp-btn" onclick="manualDart(3)">3</button>
+          <button class="kp-btn" onclick="manualDart(4)">4</button>
+          <button class="kp-btn" onclick="manualDart(5)">5</button>
+        </div>
+        <div class="keypad-row">
+          <button class="kp-btn" onclick="manualDart(6)">6</button>
+          <button class="kp-btn" onclick="manualDart(7)">7</button>
+          <button class="kp-btn" onclick="manualDart(8)">8</button>
+          <button class="kp-btn" onclick="manualDart(9)">9</button>
+          <button class="kp-btn" onclick="manualDart(10)">10</button>
+        </div>
+        <div class="keypad-row">
+          <button class="kp-btn" onclick="manualDart(11)">11</button>
+          <button class="kp-btn" onclick="manualDart(12)">12</button>
+          <button class="kp-btn" onclick="manualDart(13)">13</button>
+          <button class="kp-btn" onclick="manualDart(14)">14</button>
+          <button class="kp-btn" onclick="manualDart(15)">15</button>
+        </div>
+        <div class="keypad-row">
+          <button class="kp-btn" onclick="manualDart(16)">16</button>
+          <button class="kp-btn" onclick="manualDart(17)">17</button>
+          <button class="kp-btn" onclick="manualDart(18)">18</button>
+          <button class="kp-btn" onclick="manualDart(19)">19</button>
+          <button class="kp-btn" onclick="manualDart(20)">20</button>
+        </div>
+        <div class="keypad-row">
+          <button class="kp-btn" onclick="manualDart(25)" style="flex:2;">BULL</button>
+          <button class="kp-btn kp-miss" onclick="manualDart(0)">MISS</button>
+          <button class="kp-btn kp-undo" onclick="undoLastDart()">UNDO</button>
+        </div>
+        <div class="keypad-row">
+          <button class="kp-btn kp-mod" id="kp-mod-double" onclick="toggleKeypadMod(2)">DOUBLE</button>
+          <button class="kp-btn kp-mod" id="kp-mod-treble" onclick="toggleKeypadMod(3)">TREBLE</button>
+        </div>
+      </div>
+    </div>
     <div class="rules">
-      <div class="rule"><strong>Any hit</strong> demolishes blocks</div>
-      <div class="rule"><strong>Bust</strong> resets your score</div>
-      <div class="rule"><strong>Exactly 0</strong> = Checked Out!</div>
-      <div class="rule"><strong>Last</strong> to check out loses</div>
+      <div class="rule"><strong>Bomb</strong> — hit target to damage opponent</div>
+      <div class="rule"><strong>Rebuild</strong> — hit target to repair your blocks</div>
     </div>
     <div id="leg-badge" style="display:none;text-align:center;font-family:'Orbitron',monospace;font-size:13px;letter-spacing:3px;color:var(--gold);border:1px solid rgba(252,211,77,.3);border-radius:8px;padding:6px 10px;background:rgba(252,211,77,.06);">LEG 1</div>
 
@@ -776,7 +829,7 @@ function callPlayerName(player) {
 let _scoreIdx=2, _score=SCORE_OPTIONS[_scoreIdx], _mult=1;
 let setupPlayers=[];
 let startScore=SCORE_OPTIONS[_scoreIdx], players=[], cp=0, darts=[], seenThrows=0;
-let turnEnded=false, gameActive=false;
+let turnEnded=false, gameActive=false, keypadMod=1;
 let checkedOut=[], roundCheckedOut=[];
 let sdActive=false, sdPlayers=[], sdThrows={}, sdIdx=0;
 let missTimer=null;
@@ -1683,6 +1736,47 @@ function handleWS(data){
     seenThrows=0;
     if(!sdActive&&(darts.length>0||turnEnded)) advanceTurn();
   }
+}
+
+// ══ MANUAL INPUT ══
+function toggleKeypadMod(mul) {
+  keypadMod = (keypadMod === mul) ? 1 : mul;
+  document.getElementById('kp-mod-double').classList.toggle('active', keypadMod === 2);
+  document.getElementById('kp-mod-treble').classList.toggle('active', keypadMod === 3);
+}
+function manualDart(num) {
+  if (!gameActive || turnEnded || darts.length >= 3) return;
+  if (num === 0) {
+    registerDart(null, { name: 'M0', number: 0, multiplier: 0 });
+  } else {
+    const mul = (num === 25) ? (keypadMod === 2 ? 2 : 1) : keypadMod;
+    const name = num === 25 ? (mul === 2 ? 'D25' : 'B25') : (['','S','D','T'][mul] + num);
+    registerDart(num * mul, { name, number: num, multiplier: mul });
+  }
+  if (keypadMod !== 1) {
+    keypadMod = 1;
+    document.getElementById('kp-mod-double').classList.remove('active');
+    document.getElementById('kp-mod-treble').classList.remove('active');
+  }
+}
+function undoLastDart() {
+  if (!gameActive || !darts.length) return;
+  const p = players[cp];
+  const soFarBefore = darts.reduce((a, d) => a + d.score, 0);
+  if (p.turnStart - soFarBefore < 0) return; // bust state, can't undo
+  darts.pop();
+  p.totalDartsThrown--;
+  const soFar = darts.reduce((a, d) => a + d.score, 0);
+  p.score = p.turnStart - soFar;
+  restoreGems(cp);
+  updateScore(cp);
+  const idx = darts.length;
+  const slot = document.getElementById('dc' + idx);
+  if (slot) { slot.querySelector('.dart-slot-val').textContent = '—'; slot.className = 'dart-slot'; }
+  document.getElementById('last-dart-val').textContent =
+    darts.length ? (darts[darts.length - 1].score || 'MISS') : '—';
+  turnEnded = false;
+  updatePanel();
 }
 
 // ══ CHECKOUT HINT ══
