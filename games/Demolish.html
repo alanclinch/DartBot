@@ -972,8 +972,8 @@ function startGame() {
     pendingBonus: null,
   }));
   clearTurnTimers();
-  cp=startingPlayer; darts=[]; seenThrows=0; turnEnded=false; gameActive=true; turnToken++;
-  checkedOut=[]; roundCheckedOut=[]; missTimer=null; activeBonus=null; bonusTimers=[];
+  cp=startingPlayer; darts=[]; seenThrows=0; turnEnded=false; gameActive=true; sdActive=false; turnToken++;
+  checkedOut=[]; roundCheckedOut=[]; sdPlayers=[]; sdThrows={}; sdIdx=0; missTimer=null; activeBonus=null; bonusTimers=[];
   document.documentElement.requestFullscreen().catch(() => {});
   showScreen('game');
   buildTowers();
@@ -1093,13 +1093,15 @@ function registerDart(score, seg) {
   s >= 6 ? sfxBigLaser(s) : sfxLaser(s);
   const destroyedScore = startScore - newScore;
   const targetRemoved = Math.min(TOTAL_BLOCKS, Math.floor((destroyedScore / startScore) * TOTAL_BLOCKS));
-  removeGems(cp, targetRemoved, () => {
-    p.score = newScore; updateScore(cp);
-    if (newScore === 0) { handleCheckout(cp); return; }
+  const checkoutIdx = cp; // capture before animation — cp can change if WS Takeout fires mid-animation
+  if (newScore === 0) { turnEnded = true; gameActive = false; } // lock early so WS can't advance turn during animation
+  removeGems(checkoutIdx, targetRemoved, () => {
+    p.score = newScore; updateScore(checkoutIdx);
+    if (newScore === 0) { handleCheckout(checkoutIdx); return; }
     if (newScore <= 10) sfxWarn();
     resolveBonusAfterDart(bonusToResolve, seg, false);
     checkAfterDart();
-    prepareBonusAfterDart(cp, !!bonusToResolve);
+    prepareBonusAfterDart(checkoutIdx, !!bonusToResolve);
   });
 }
 
@@ -1892,14 +1894,6 @@ async function showWin(w) {
     }
   }
 
-  try {
-    for (const p of players) {
-      const won = p === w;
-      const pts = startScore - p.score;
-      await saveX01Stat(p.name, p.flag, won, pts, p.totalDartsThrown, p.isCpu);
-    }
-  } catch(e) { console.error('Save error:', e); }
-
   showScreen('winner');
 
   // CPU vs CPU: auto-advance to next leg
@@ -1918,6 +1912,15 @@ async function showWin(w) {
       else { clearInterval(window._cpuAutoTimer); window._cpuAutoTimer = null; nextLeg(); }
     }, 1000);
   }
+
+  // Save stats in background after screen is already showing
+  try {
+    for (const p of players) {
+      const won = p === w;
+      const pts = startScore - p.score;
+      await saveX01Stat(p.name, p.flag, won, pts, p.totalDartsThrown, p.isCpu);
+    }
+  } catch(e) { console.error('Save error:', e); }
 }
 
 function stopCpuAuto() {
