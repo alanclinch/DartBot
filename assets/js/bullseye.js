@@ -118,6 +118,7 @@ function endGame() {
 }
 
 function initRoundOne() {
+  resetManualMultiplier();
   state.phase = 'r1';
   state.darts = [];
   flash("It's Bully's Category Board!", 'var(--gold)');
@@ -126,6 +127,7 @@ function initRoundOne() {
 }
 
 function initRoundTwo() {
+  resetManualMultiplier();
   state.phase = 'r2_throw';
   state.darts = [];
   state.round2Score = 0;
@@ -135,6 +137,7 @@ function initRoundTwo() {
 }
 
 function initRoundThree() {
+  resetManualMultiplier();
   state.phase = 'r3';
   state.darts = [];
   state.prizeDarts = 0;
@@ -274,6 +277,7 @@ function offerFinal() {
 
 function startFinal() {
   document.getElementById('final-modal').classList.remove('open');
+  resetManualMultiplier();
   state.phase = 'final';
   state.darts = [];
   state.finalScore = 0;
@@ -296,6 +300,7 @@ function resolveFinal() {
 }
 
 function finishGame(starWon) {
+  resetManualMultiplier();
   state.phase = 'complete';
   state.gameOver = true;
   document.getElementById('final-modal').classList.remove('open');
@@ -499,8 +504,8 @@ function renderSidebars() {
     const d = darts[i];
     return `<div class="dart-slot ${d ? (d.miss ? 'miss' : 'hit') : ''}"><span>${i + 1}</span><span>${d ? `${escapeHTML(d.label)} - ${escapeHTML(d.sub)}` : '-'}</span></div>`;
   }).join('');
-  const total = phase === 'final' ? state.finalScore : phase.startsWith('r2') ? state.round2Score : phase === 'r3' ? state.prizeDarts : darts.length;
-  document.getElementById('turn-total').textContent = phase === 'r3' ? `Darts: ${total}/9` : `Total: ${total || 0}`;
+  const total = phase === 'final' || (phase === 'complete' && state.finalScore) ? state.finalScore : phase.startsWith('r2') ? state.round2Score : phase === 'r3' ? state.prizeDarts : darts.length;
+  document.getElementById('turn-total').textContent = phase === 'r3' ? `Darts: ${total}/9` : (phase === 'final' || (phase === 'complete' && state.finalScore) ? `Score: ${total || 0}` : `Total: ${total || 0}`);
 }
 
 function phaseLabel(phase) {
@@ -541,6 +546,14 @@ function setManualMultiplier(multiplier) {
   document.getElementById('mod-treble').classList.toggle('active', manualMultiplier === 3);
 }
 
+function resetManualMultiplier() {
+  manualMultiplier = 1;
+  const doubleBtn = document.getElementById('mod-double');
+  const trebleBtn = document.getElementById('mod-treble');
+  if (doubleBtn) doubleBtn.classList.remove('active');
+  if (trebleBtn) trebleBtn.classList.remove('active');
+}
+
 function manualDart(num) {
   if (num === 0) registerDart(null);
   else {
@@ -548,7 +561,7 @@ function manualDart(num) {
     const number = num === 50 ? 25 : num;
     registerDart({ number, multiplier, name: number === 25 ? (multiplier === 2 ? 'D25' : 'B25') : `${multiplier === 3 ? 'T' : multiplier === 2 ? 'D' : 'S'}${number}` });
   }
-  if (manualMultiplier !== 1) setManualMultiplier(manualMultiplier);
+  resetManualMultiplier();
 }
 
 function handleWS(data) {

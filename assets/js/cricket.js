@@ -60,15 +60,10 @@ let sql = null;
 async function initNeonDB() {
   try {
     const { neon } = await import('https://esm.sh/@neondatabase/serverless');
-    let connString = localStorage.getItem('neon_db_string');
+    const connString = localStorage.getItem('neon_db_string');
     if (!connString) {
-      connString = prompt("Please enter your Neon Database Connection String to enable cloud stats tracking:\n(Leave blank to play offline)");
-      if (connString && connString.trim() !== "") {
-        localStorage.setItem('neon_db_string', connString.trim());
-      } else {
-        console.warn('Neon DB disabled: No connection string provided.');
-        return;
-      }
+      console.log('Neon DB: no connection string saved. Use Settings → Connect DB to enable cloud stats.');
+      return;
     }
     sql = neon(connString);
     console.log('✅ Connected to Neon PostgreSQL Database!');
@@ -336,7 +331,7 @@ function setTestMode(val) {
 function setVoice(val) {
   voiceEnabled = val;
   if (!val) cancelSpeech();
-  try { localStorage.setItem('dartbot_voice', val ? '1' : '0'); } catch {}
+  try { localStorage.setItem('dartbot_voice_enabled', val ? '1' : '0'); } catch {}
 }
 function setSfx(val) {
   sfxEnabled = val;
@@ -440,7 +435,7 @@ async function renderRecentPlayers(){
       const s = saved[n];
       const mpr = savedMPR(s);
       const flag = s.flag || 'sco';
-      return `<button class="recent-chip" onclick="addSavedPlayer('${escapeHTML(n).replace(/'/g,"\\'")}', '${flag}')">
+      return `<button class="recent-chip" data-name="${escapeHTML(n)}" data-flag="${escapeHTML(flag)}">
         <div style="width:24px;height:16px;margin-right:6px;">${renderFlag(flag)}</div> ${escapeHTML(n)}<span class="chip-stat">${mpr} MPR</span>
       </button>`;
     }).join('') : '';
@@ -1639,6 +1634,15 @@ function showBroadcastEvent(type, kicker, main, sub, duration) {
 // initSpeech, speak, spawnConfetti — from utils.js
 
 // =============================================
+// RECENT PLAYER CHIPS
+// =============================================
+document.addEventListener('click', e => {
+  const chip = e.target.closest('.recent-chip');
+  if (!chip) return;
+  addSavedPlayer(chip.dataset.name, chip.dataset.flag || 'sco');
+});
+
+// =============================================
 // KEYBOARD TESTING
 // =============================================
 document.addEventListener('keydown', e => {
@@ -1676,7 +1680,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const cb = document.getElementById('test-mode-toggle');
     if (cb) cb.checked = true;
   }
-  voiceEnabled = localStorage.getItem('dartbot_voice') !== '0';
+  voiceEnabled = localStorage.getItem('dartbot_voice_enabled') !== '0';
   sfxEnabled   = localStorage.getItem('dartbot_sfx')   !== '0';
   const vcb = document.getElementById('voice-toggle');
   const scb = document.getElementById('sfx-toggle');
