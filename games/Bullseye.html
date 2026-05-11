@@ -24,7 +24,18 @@
       <input id="team-name" class="team-input" maxlength="24" value="The Contestants">
       <div class="setup-actions">
         <button class="primary-btn" onclick="startGame()">Start Game</button>
-        <a class="secondary-link" href="../index.html">Menu</a>
+      </div>
+    </div>
+    <div class="setup-card">
+      <h3>Settings</h3>
+      <div class="settings-grid">
+        <label class="setting-row">
+          <input type="checkbox" id="voice-toggle" onchange="setVoiceEnabled(this.checked)" checked>
+          <span>Voice Caller</span>
+        </label>
+      </div>
+      <div class="setting-actions">
+        <button class="setting-action-btn" onclick="window.location.href='../index.html'">Main Menu</button>
       </div>
     </div>
   </div>

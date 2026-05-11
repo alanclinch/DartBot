@@ -179,6 +179,7 @@ function startGame() {
 function endGame() {
   clearQuestionTimer();
   state.gameOver = true;
+  seenThrows = 0;
   showScreen('setup');
 }
 
@@ -727,6 +728,12 @@ function sfxInOne() {
   sfxCheckout();
 }
 
+function setVoiceEnabled(val) {
+  voiceEnabled = val;
+  if (!val) cancelSpeech();
+  try { localStorage.setItem('dartbot_voice_enabled', val ? '1' : '0'); } catch {}
+}
+
 function speakBullseye(text, interrupt = false) {
   if (!voiceEnabled) return;
   speak(text, interrupt);
@@ -735,6 +742,8 @@ function speakBullseye(text, interrupt = false) {
 document.addEventListener('DOMContentLoaded', () => {
   state = freshState();
   voiceEnabled = localStorage.getItem('dartbot_voice_enabled') !== '0';
+  const voiceChk = document.getElementById('voice-toggle');
+  if (voiceChk) voiceChk.checked = voiceEnabled;
   renderManualGrid();
   initSpeech();
   initAutodarts(handleWS);
