@@ -307,7 +307,9 @@ body{
 .setting-action-btn:hover{border-color:var(--blue);color:var(--blue);}
 
 /* ── STARFIELD (parallax background) ── */
-#starfield{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden;}
+/* z-index:-1 keeps stars between body background and body content, so no
+   foreground element needs an explicit z-index to sit on top. */
+#starfield{position:fixed;inset:0;pointer-events:none;z-index:-1;overflow:hidden;}
 .star-layer{position:absolute;inset:-2% -2%;will-change:transform;}
 .star-layer-0{animation:starDriftSlow 90s linear infinite;}
 .star-layer-1{animation:starDriftFast 55s linear infinite;}
@@ -318,8 +320,6 @@ body{
 @keyframes starDriftSlow{from{transform:translate3d(0,0,0);}to{transform:translate3d(-26px,0,0);}}
 @keyframes starDriftFast{from{transform:translate3d(0,0,0);}to{transform:translate3d(-72px,0,0);}}
 @keyframes starTwinkle{0%,100%{opacity:.45;}50%{opacity:1;}}
-/* keep setup, playfield etc above stars */
-#setup,#game,#sudden-death,#winner,.modal-overlay,#log-modal,#confetti{position:relative;z-index:1;}
 
 /* ── SCREEN SHAKE ── */
 .playfield{will-change:transform;}
