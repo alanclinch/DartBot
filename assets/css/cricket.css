@@ -4,513 +4,548 @@
 /* ── GAME SCREEN ──────────────────────────────────────────── */
 #game { flex-direction: row; height: 100vh; overflow: hidden; }
 
-/* Enhanced Graphics hook. Keep this scoped to the game screen so setup/winner stay unchanged. */
+/* ═══════════════════════════════════════════════════════════
+   ENHANCED GRAPHICS — "daylight broadcast" theme
+   Designed for a 1920×1080 LCD in a bright room. Rules:
+   - Solid accent bars with dark text (survive glare; glows don't)
+   - Flat matte navy panels, no glass/translucency
+   - Heavy condensed white type, readable at 3–4 m
+   - Everything scoped under #game.enhanced-graphics; toggling the
+     mode off must reproduce stock Cricket exactly.
+   Winner-screen takeover lives at the bottom of this file under
+   body.enhanced-winner (the one sanctioned body-level promotion).
+   ═══════════════════════════════════════════════════════════ */
 #game.enhanced-graphics {
-  --enhanced-bg: #03070b;
-  --enhanced-panel: rgba(7,14,20,.86);
-  --enhanced-panel-2: rgba(12,22,31,.78);
-  --enhanced-grid: rgba(165,190,210,.16);
-  --enhanced-left: #f2b84b;
-  --enhanced-open: #54f06a;
-  --enhanced-closed: #ff4b55;
-  --enhanced-blue: #42a3ff;
-  --enhanced-glow: rgba(96,165,250,.28);
+  --ew-bg-hi: #182a45;
+  --ew-bg-lo: #0c1626;
+  --ew-panel: #16263d;
+  --ew-panel-2: #1d3050;
+  --ew-line: rgba(255,255,255,.16);
+  --ew-amber: #ffb938;
+  --ew-blue: #38b1ff;
+  --ew-green: #3ddc6a;
+  --ew-red: #ff4655;
+  --ew-ink: #0a0c10;
+  --ew-dim: rgba(214,228,242,.72);
   position: relative;
   display: block;
   padding: 86px 18px 74px;
-  background:
-    radial-gradient(circle at 20% 35%, rgba(242,184,75,.12), transparent 30%),
-    radial-gradient(circle at 82% 30%, rgba(66,163,255,.16), transparent 32%),
-    linear-gradient(180deg, #06101a 0%, var(--enhanced-bg) 58%, #05080d 100%);
+  background: linear-gradient(180deg, var(--ew-bg-hi), var(--ew-bg-lo) 72%);
   color: #f7fbff;
 }
 
-#game.enhanced-graphics::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background:
-    linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,.026) 1px, transparent 1px);
-  background-size: 42px 42px;
-  mask-image: linear-gradient(to bottom, transparent, #000 12%, #000 88%, transparent);
-}
-
+/* Hidden outside enhanced mode (markup is always present) */
 .enhanced-topbar { display: none; }
 .enhanced-player-stats { display: none; }
 
+/* ── TOP BAR ── */
 #game.enhanced-graphics .enhanced-topbar {
   position: absolute;
-  top: 14px; left: 18px; right: 18px; height: 52px;
+  top: 16px; left: 18px; right: 18px; height: 54px;
   display: grid;
-  grid-template-columns: minmax(230px, 1fr) minmax(360px, 600px) minmax(140px, 1fr);
+  grid-template-columns: 1fr minmax(420px, 620px) 1fr;
   align-items: center;
   z-index: 4;
 }
-
 #game.enhanced-graphics .enhanced-brand {
-  font-family: 'Orbitron', monospace;
-  font-weight: 900;
-  font-size: 24px;
-  letter-spacing: 1px;
+  font-family: 'Exo 2', sans-serif;
   font-style: italic;
+  font-weight: 900;
+  font-size: 26px;
+  letter-spacing: 0;
+  line-height: 1;
 }
 #game.enhanced-graphics .enhanced-brand span:first-child { color: #fff; }
-#game.enhanced-graphics .enhanced-brand span:nth-child(2) { color: var(--enhanced-left); }
+#game.enhanced-graphics .enhanced-brand span:nth-child(2) { color: var(--ew-amber); }
 #game.enhanced-graphics .enhanced-brand small {
   display: block;
-  margin-top: 4px;
+  margin-top: 5px;
   font: 700 10px 'Exo 2', sans-serif;
-  letter-spacing: 1.3px;
-  color: rgba(235,245,255,.74);
   font-style: normal;
+  letter-spacing: 2px;
+  color: var(--ew-dim);
 }
-
 #game.enhanced-graphics .enhanced-match-strip {
-  height: 52px;
+  height: 54px;
   display: grid;
-  grid-template-columns: 1fr 180px 1fr;
-  border: 1px solid rgba(170,190,215,.3);
-  border-radius: 14px;
+  grid-template-columns: 1fr 200px 1fr;
+  border: 1px solid var(--ew-line);
+  border-radius: 10px;
   overflow: hidden;
-  background: linear-gradient(180deg, rgba(11,19,27,.9), rgba(2,6,10,.88));
-  box-shadow: inset 0 0 28px rgba(255,255,255,.03), 0 0 22px rgba(0,0,0,.42);
+  background: var(--ew-panel);
 }
 #game.enhanced-graphics .enhanced-match-cell {
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  color: rgba(235,245,255,.74);
-  font: 700 11px 'Exo 2', sans-serif;
-  letter-spacing: 1px;
+  gap: 2px;
+  color: var(--ew-dim);
+  font: 800 10px 'Exo 2', sans-serif;
+  letter-spacing: 2px;
 }
 #game.enhanced-graphics .enhanced-match-cell strong {
   color: #fff;
-  font-size: 14px;
-  line-height: 1.2;
+  font-size: 16px;
+  letter-spacing: 1px;
+  line-height: 1.1;
 }
 #game.enhanced-graphics .enhanced-match-title {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--enhanced-left);
-  font: 900 24px 'Orbitron', monospace;
-  border-inline: 1px solid rgba(170,190,215,.24);
-  background: rgba(0,0,0,.38);
+  color: var(--ew-ink);
+  font: 900 26px 'Exo 2', sans-serif;
+  letter-spacing: 3px;
+  background: var(--ew-amber);
 }
-#game.enhanced-graphics .enhanced-icons {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
-#game.enhanced-graphics .enhanced-icons span {
-  width: 52px; height: 52px; border-radius: 12px;
-  border: 1px solid rgba(170,190,215,.24);
-  background: rgba(4,8,13,.72);
-}
+#game.enhanced-graphics .enhanced-icons { display: none; }
 
+/* ── SCOREBOARD FRAME ── */
 #game.enhanced-graphics #scoreboard {
   position: relative;
   z-index: 2;
   height: calc(100vh - 160px);
-  min-height: 560px;
+  min-height: 540px;
   width: 100%;
   padding: 0;
   display: grid;
-  grid-template-rows: 250px 1fr;
-  gap: 0;
+  grid-template-rows: 264px minmax(0, 1fr);
+  row-gap: 14px;
   overflow: visible;
 }
-
 #game.enhanced-graphics .sb-top,
 #game.enhanced-graphics .sb-body {
   display: grid;
-  grid-template-columns: minmax(310px, 1fr) 330px minmax(310px, 1fr) !important;
-  gap: 22px;
+  grid-template-columns: minmax(300px, 1fr) 340px minmax(300px, 1fr) !important;
+  column-gap: 18px;
 }
-
-#game.enhanced-graphics .sb-top {
-  margin: 0;
-  align-items: stretch;
-}
-
+#game.enhanced-graphics .sb-top { margin: 0; align-items: stretch; gap: 18px; }
 #game.enhanced-graphics .sb-num-label {
-  visibility: hidden;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-}
-#game.enhanced-graphics .sb-num-label::before {
-  content: "";
-  color: #fff;
-  font: 900 28px 'Exo 2', sans-serif;
-  letter-spacing: 1px;
+  visibility: hidden;  /* keeps its grid cell so the right card stays in col 3 */
+  border: 0; background: transparent; box-shadow: none;
 }
 
+/* ── PLAYER CARDS ── */
 #game.enhanced-graphics .sb-player-hdr {
   min-width: 0;
-  border-radius: 12px 12px 0 0;
-  border: 1px solid rgba(242,184,75,.52);
-  border-bottom-color: rgba(255,255,255,.14);
-  background:
-    radial-gradient(circle at 22% 50%, rgba(242,184,75,.18), transparent 32%),
-    linear-gradient(180deg, rgba(37,25,9,.88), rgba(8,10,10,.88));
-  box-shadow: 0 0 26px rgba(242,184,75,.22), inset 0 0 42px rgba(242,184,75,.07);
-  padding: 24px 34px 18px;
+  position: relative;
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: 62px minmax(0, 1fr) 58px;
   grid-template-columns: 1fr;
-  align-items: stretch;
-  justify-items: start;
+  padding: 0;
+  border-radius: 14px;
+  border: 1px solid var(--ew-line);
+  border-left: 6px solid var(--ew-amber);
+  background: linear-gradient(180deg, var(--ew-panel-2), var(--ew-panel));
+  overflow: hidden;
+  transition: filter .25s;
+  text-align: left;
+  gap: 0;
 }
 #game.enhanced-graphics .sb-top .sb-player-hdr:last-child {
-  justify-items: end;
-  border-color: rgba(66,163,255,.58);
-  border-bottom-color: rgba(255,255,255,.14);
-  background:
-    radial-gradient(circle at 78% 50%, rgba(66,163,255,.18), transparent 32%),
-    linear-gradient(180deg, rgba(10,22,40,.9), rgba(5,9,16,.9));
-  box-shadow: 0 0 26px rgba(66,163,255,.32), inset 0 0 42px rgba(66,163,255,.09);
+  border-left: 1px solid var(--ew-line);
+  border-right: 6px solid var(--ew-blue);
 }
+#game.enhanced-graphics .sb-player-hdr:not(.active-col) {
+  filter: brightness(.72) saturate(.6);
+}
+#game.enhanced-graphics .sb-player-hdr.active-col { transform: none; }
 #game.enhanced-graphics .sb-active-dot,
 #game.enhanced-graphics .sb-flag-corner { display: none; }
+
+/* Name bar: solid accent, dark text — the daylight-proof element */
 #game.enhanced-graphics .sb-pname {
-  order: 1;
-  grid-column: 1;
-  width: auto;
+  width: 100%;
   max-width: 100%;
-  color: var(--enhanced-left);
-  font: 900 clamp(19px, 2vw, 29px) 'Exo 2', sans-serif !important;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  margin: 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 26px 6px;
+  background: var(--ew-amber);
+  color: var(--ew-ink);
+  font: 900 clamp(24px, 2.1vw, 38px) 'Exo 2', sans-serif !important;
   line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-align: left;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 82%);
 }
-#game.enhanced-graphics .sb-top .sb-player-hdr:last-child .sb-pname { color: var(--enhanced-blue); }
+#game.enhanced-graphics .sb-top .sb-player-hdr:last-child .sb-pname {
+  background: var(--ew-blue);
+  justify-content: flex-end;
+  clip-path: polygon(0 0, 100% 0, 100% 82%, 0 100%);
+}
+#game.enhanced-graphics .sb-player-hdr.active-col .sb-pname::after {
+  content: "ON THROW";
+  flex: none;
+  margin-left: auto;
+  background: var(--ew-ink);
+  color: var(--ew-amber);
+  font: 900 12px/1 'Exo 2', sans-serif;
+  letter-spacing: 2px;
+  padding: 7px 13px 6px;
+  border-radius: 999px;
+}
+#game.enhanced-graphics .sb-top .sb-player-hdr:last-child.active-col .sb-pname::after {
+  color: var(--ew-blue);
+  margin-left: 0;
+  margin-right: auto;
+  order: -1;
+}
+
+/* Score: huge, white, centered */
 #game.enhanced-graphics .sb-score-big {
-  order: 2;
-  grid-column: 1;
-  margin-top: 0;
   align-self: center;
-  justify-self: start;
-  font-size: clamp(82px, 7.5vw, 124px) !important;
+  justify-self: center;
+  margin: 0;
+  font-family: 'Exo 2', sans-serif !important;
+  font-weight: 900 !important;
+  font-size: clamp(92px, 9.2vw, 176px) !important;
+  line-height: .8;
+  letter-spacing: -2px;
   color: #fff;
-  line-height: .86;
-  text-shadow: 0 0 22px rgba(255,255,255,.25);
+  text-shadow: 0 4px 0 rgba(0,0,0,.3);
+  white-space: nowrap;
 }
-#game.enhanced-graphics .sb-score-big::after {
-  content: "TOTAL POINTS";
-  display: block;
-  margin-top: 10px;
-  color: var(--enhanced-left);
-  font: 800 clamp(13px, 1.1vw, 18px) 'Exo 2', sans-serif;
-  letter-spacing: 1.2px;
-  line-height: 1;
-  text-shadow: none;
-}
-#game.enhanced-graphics .sb-top .sb-player-hdr:last-child .sb-score-big::after {
-  color: var(--enhanced-blue);
-}
-#game.enhanced-graphics .sb-mpr {
-  display: block;
-  order: 3;
-  grid-column: 1;
-  color: var(--enhanced-left);
-  font: 800 clamp(15px, 1.2vw, 20px) 'Exo 2', sans-serif !important;
-  letter-spacing: 1px;
-  line-height: 1;
-  margin-top: 8px;
-  text-transform: uppercase;
-}
-#game.enhanced-graphics .sb-top .sb-player-hdr:last-child .sb-mpr {
-  color: var(--enhanced-blue);
-  text-align: right;
-}
+#game.enhanced-graphics .sb-score-big::after { content: none; }
+
+/* MPR line is replaced by the stat strip */
+#game.enhanced-graphics .sb-mpr { display: none !important; }
+
+/* Stat strip: MPR | MARKS | CLOSED */
 #game.enhanced-graphics .enhanced-player-stats {
-  display: none;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  align-self: stretch;
+  width: 100%;
+  border-top: 1px solid var(--ew-line);
+  background: rgba(0,0,0,.28);
 }
 #game.enhanced-graphics .enhanced-player-stats div {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  text-align: center;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 0;
 }
 #game.enhanced-graphics .enhanced-player-stats div + div {
-  border-left: 1px solid rgba(255,255,255,.16);
+  border-left: 1px solid var(--ew-line);
 }
 #game.enhanced-graphics .enhanced-player-stats span {
-  color: rgba(205,218,232,.78);
+  color: var(--ew-dim);
   font: 800 10px 'Exo 2', sans-serif;
-  letter-spacing: 1.4px;
+  letter-spacing: 2px;
 }
 #game.enhanced-graphics .enhanced-player-stats strong {
-  color: #f6fbff;
-  font: 900 clamp(17px, 1.5vw, 24px) 'Orbitron', monospace;
-  line-height: 1.1;
-  text-shadow: 0 0 10px rgba(255,255,255,.18);
-}
-#game.enhanced-graphics .sb-player-hdr.active-col {
-  transform: translateY(-2px);
-  filter: brightness(1.12);
+  color: #fff;
+  font: 700 clamp(17px, 1.5vw, 23px) 'Orbitron', monospace;
+  line-height: 1.05;
 }
 
+/* ── CRICKET ROWS ── */
 #game.enhanced-graphics .sb-body {
   flex: initial;
   overflow: visible;
+  grid-auto-rows: minmax(0, 1fr);   /* rows stretch to fill full height */
+  row-gap: 8px;
 }
-#game.enhanced-graphics .sb-row {
-  display: contents;
-  border: 0;
-}
-#game.enhanced-graphics .sb-num-cell,
+#game.enhanced-graphics .sb-row { display: contents; border: 0; }
+#game.enhanced-graphics .sb-num-cell { display: none; }  /* sits behind the HUD anyway */
+
 #game.enhanced-graphics .sb-mark-cell {
-  min-height: 64px;
-  border-bottom: 1px solid var(--enhanced-grid);
-  border-radius: 0;
-}
-#game.enhanced-graphics .sb-num-cell {
-  grid-column: 2;
-  color: #f7fbff;
-  background: linear-gradient(90deg, rgba(255,255,255,.02), rgba(255,255,255,.08), rgba(255,255,255,.02));
-  font-size: clamp(28px, 2.8vw, 42px) !important;
-  text-shadow: 0 0 18px rgba(255,255,255,.14);
-}
-#game.enhanced-graphics .bull-svg { width: 72px; }
-#game.enhanced-graphics .sb-mark-cell {
-  background: var(--enhanced-panel);
-  border-inline: 1px solid rgba(255,255,255,.08);
+  min-height: 0;
+  position: relative;
   display: grid;
-  grid-template-columns: 96px 1fr;
-  align-items: center;
+  grid-template-columns: minmax(0, 1fr) 86px;
+  align-items: stretch;
+  border-radius: 10px;
+  border: 1px solid var(--ew-line);
+  background: var(--ew-panel);
+  color: var(--ew-amber);          /* pips pick this up via currentColor */
+  transition: background .2s, border-color .2s, opacity .2s;
 }
-#game.enhanced-graphics .sb-mark-cell::before {
-  content: attr(data-label);
-  padding-left: 34px;
-  color: #f7fbff;
-  font: 900 clamp(20px, 1.8vw, 30px) 'Exo 2', sans-serif;
-  line-height: 1;
-}
-#game.enhanced-graphics .sb-mark-cell[id$="-0"] {
-  grid-column: 1;
-  color: var(--enhanced-left);
-  background: linear-gradient(90deg, rgba(38,25,8,.72), rgba(10,10,10,.9));
-  box-shadow: inset 30px 0 52px rgba(242,184,75,.08);
-}
+#game.enhanced-graphics .sb-mark-cell[id$="-0"] { grid-column: 1; }
 #game.enhanced-graphics .sb-mark-cell[id$="-1"] {
   grid-column: 3;
-  color: var(--enhanced-blue);
-  background: linear-gradient(270deg, rgba(8,23,43,.76), rgba(7,11,14,.9));
-  box-shadow: inset -30px 0 52px rgba(66,163,255,.08);
-}
-#game.enhanced-graphics .sb-mark-cell.active-turn {
-  background: linear-gradient(90deg, rgba(48,31,8,.78), rgba(10,10,10,.9));
-  border-color: rgba(255,255,255,.08);
-  box-shadow: inset 0 0 34px rgba(242,184,75,.08);
-}
-#game.enhanced-graphics .sb-mark-cell[id$="-1"].active-turn {
-  background: linear-gradient(270deg, rgba(8,26,52,.78), rgba(7,11,14,.9));
-}
-#game.enhanced-graphics .sb-mark-cell[id$="-1"].active-turn {
-  box-shadow: inset 0 0 34px rgba(66,163,255,.08);
-}
-#game.enhanced-graphics .sb-mark-cell.pressure-cell {
-  border-color: rgba(255,255,255,.08) !important;
-  box-shadow: inset 0 0 28px rgba(252,211,77,.07);
-}
-#game.enhanced-graphics .sb-mark-cell.is-scoring-cell {
-  border-color: rgba(255,255,255,.08);
-  box-shadow: none;
-}
-#game.enhanced-graphics .sb-mark-cell.all-closed-cell {
-  color: var(--enhanced-closed);
-  border-color: rgba(255,75,85,.45);
-  box-shadow: inset 0 0 36px rgba(255,75,85,.1), 0 0 18px rgba(255,75,85,.12);
-  opacity: .82;
-}
-#game.enhanced-graphics .sb-num-cell.num-scoring {
-  color: #f7fbff;
-  text-shadow: 0 0 18px rgba(255,255,255,.14);
-}
-#game.enhanced-graphics .sb-num-cell.num-closed-all {
-  color: var(--enhanced-closed);
-  text-decoration: none;
-  text-shadow: 0 0 18px rgba(255,75,85,.55);
-}
-#game.enhanced-graphics .mark-wrap { padding: 4px 28px; }
-#game.enhanced-graphics .mark-closed-line { display: none; }
-#game.enhanced-graphics .enhanced-mark-svg { max-height: 54px; overflow: visible; }
-#game.enhanced-graphics .enhanced-mark-svg circle {
-  fill: rgba(0,0,0,.24);
-  stroke: rgba(205,225,240,.45);
-  stroke-width: 2;
-}
-#game.enhanced-graphics .enhanced-mark-svg path {
-  fill: none;
-  stroke: rgba(205,225,240,.3);
-  stroke-width: 2;
-  stroke-linecap: round;
-}
-#game.enhanced-graphics .enhanced-mark-svg .filled circle {
-  stroke: currentColor;
-  filter: drop-shadow(0 0 7px currentColor);
-}
-#game.enhanced-graphics .enhanced-mark-svg .filled circle:nth-child(2) {
-  fill: currentColor;
-}
-#game.enhanced-graphics .enhanced-mark-svg .filled path {
-  stroke: currentColor;
-}
-#game.enhanced-graphics .enhanced-mark-svg.scoring .filled circle {
-  stroke: var(--enhanced-open);
-  filter: drop-shadow(0 0 8px var(--enhanced-open));
-}
-#game.enhanced-graphics .enhanced-mark-svg.scoring .filled circle:nth-child(2) {
-  fill: var(--enhanced-open);
-}
-#game.enhanced-graphics .enhanced-mark-svg.scoring .filled path {
-  stroke: var(--enhanced-open);
-}
-#game.enhanced-graphics .mark-svg-wrap:empty::before {
-  content: "";
-  width: 34px; height: 34px;
-  border-radius: 50%;
-  border: 2px solid rgba(205,225,240,.34);
-  background: rgba(0,0,0,.18);
+  grid-template-columns: 86px minmax(0, 1fr);
+  color: var(--ew-blue);
 }
 
+/* Row number label, hugging the central HUD */
+#game.enhanced-graphics .sb-mark-cell::before {
+  content: attr(data-label);
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-left: 1px solid var(--ew-line);
+  color: #fff;
+  font: 900 clamp(24px, 1.8vw, 34px) 'Exo 2', sans-serif;
+  line-height: 1;
+  padding: 0;
+}
+#game.enhanced-graphics .sb-mark-cell[id$="-1"]::before {
+  grid-column: 1;
+  border-left: 0;
+  border-right: 1px solid var(--ew-line);
+}
+#game.enhanced-graphics .sb-mark-cell[data-label="BULL"]::before {
+  font-size: clamp(14px, 1vw, 18px);
+  letter-spacing: 1px;
+}
+#game.enhanced-graphics .mark-wrap {
+  grid-column: 1;
+  grid-row: 1;
+  padding: 8px 14px;
+}
+#game.enhanced-graphics .sb-mark-cell[id$="-1"] .mark-wrap { grid-column: 2; }
+#game.enhanced-graphics .mark-closed-line { display: none; }
+
+/* Lamp pips: three solid blocks, lit left-to-right */
+#game.enhanced-graphics .enhanced-mark-svg {
+  display: block;
+  width: min(170px, 88%);
+  height: auto;
+  max-height: 44px;
+  margin: 0 auto;
+}
+#game.enhanced-graphics .enhanced-mark-svg rect.empty {
+  fill: rgba(255,255,255,.05);
+  stroke: rgba(255,255,255,.30);
+  stroke-width: 2;
+}
+#game.enhanced-graphics .enhanced-mark-svg rect.filled {
+  fill: currentColor;
+  stroke: none;
+}
+#game.enhanced-graphics .enhanced-mark-svg.scoring rect.filled {
+  fill: var(--ew-green);
+}
+
+/* Cell states */
+#game.enhanced-graphics .sb-mark-cell.active-turn {
+  background: linear-gradient(180deg, rgba(255,185,56,.12), rgba(255,185,56,.05)), var(--ew-panel);
+  border-color: rgba(255,185,56,.42);
+  box-shadow: none;
+}
+#game.enhanced-graphics .sb-mark-cell[id$="-1"].active-turn {
+  background: linear-gradient(180deg, rgba(56,177,255,.12), rgba(56,177,255,.05)), var(--ew-panel);
+  border-color: rgba(56,177,255,.42);
+}
+#game.enhanced-graphics .sb-mark-cell.is-scoring-cell {
+  border-color: rgba(61,220,106,.55);
+  box-shadow: inset 0 0 0 1px rgba(61,220,106,.25);
+}
+#game.enhanced-graphics .sb-mark-cell.pressure-cell {
+  border-color: rgba(255,70,85,.6) !important;
+  box-shadow: inset 0 0 0 1px rgba(255,70,85,.3);
+}
+#game.enhanced-graphics .sb-mark-cell.all-closed-cell {
+  opacity: .42;
+  color: var(--ew-red);
+  border-color: var(--ew-line);
+  box-shadow: none;
+}
+#game.enhanced-graphics .sb-mark-cell.all-closed-cell::before {
+  color: var(--ew-red);
+  text-decoration: line-through;
+}
+
+/* ── CENTRAL HUD COLUMN ── */
 #game.enhanced-graphics #side-panel {
   position: absolute;
   z-index: 3;
   left: 50%;
   top: 86px;
-  bottom: 78px;
-  width: 330px;
+  bottom: 74px;
+  width: 340px;
   transform: translateX(-50%);
-  padding: 16px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto auto auto auto minmax(0, 1fr);
   gap: 12px;
+  padding: 16px;
   overflow: hidden;
-  background: linear-gradient(180deg, rgba(5,11,17,.98), rgba(2,5,9,.99));
-  border: 1px solid rgba(170,190,215,.26);
-  border-radius: 14px;
-  box-shadow: 0 0 34px rgba(0,0,0,.44), inset 0 0 48px rgba(255,255,255,.025);
+  background: linear-gradient(180deg, var(--ew-panel-2), var(--ew-bg-lo));
+  border: 1px solid var(--ew-line);
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0,0,0,.45);
 }
+#game.enhanced-graphics #side-panel > * { grid-column: 1 / -1; min-width: 0; min-height: 0; }
+/* TARGET and ROUND share a row; keypad takes all leftover height */
+#game.enhanced-graphics #side-panel > div:has(.turn-info)   { grid-row: 1; }
+#game.enhanced-graphics #side-panel > div:has(.dart-slots)  { grid-row: 2; }
+#game.enhanced-graphics #side-panel > div:has(.target-box)  { grid-row: 3; grid-column: 1; }
+#game.enhanced-graphics #side-panel > div:has(.round-box)   { grid-row: 3; grid-column: 2; }
+#game.enhanced-graphics #side-panel > .variant-badge        { grid-row: 4; }
+#game.enhanced-graphics #side-panel > .keypad-wrap          { grid-row: 5; }
 
 #game.enhanced-graphics .panel-label {
   font-size: 10px;
-  letter-spacing: 2px;
-  margin-bottom: 5px;
+  letter-spacing: 2.5px;
+  color: var(--ew-dim);
+  margin-bottom: 6px;
 }
 #game.enhanced-graphics .turn-info,
 #game.enhanced-graphics .target-box,
 #game.enhanced-graphics .round-box,
 #game.enhanced-graphics .variant-badge,
 #game.enhanced-graphics .keypad-wrap {
-  background: rgba(10,17,24,.78);
-  border: 1px solid rgba(170,190,215,.2);
-  border-radius: 9px;
+  background: rgba(255,255,255,.04);
+  border: 1px solid var(--ew-line);
+  border-radius: 10px;
+  box-shadow: none;
 }
-#game.enhanced-graphics .turn-info {
-  padding: 18px 14px;
-  border-color: rgba(242,184,75,.44);
-  box-shadow: 0 0 22px rgba(242,184,75,.14), inset 0 0 24px rgba(242,184,75,.05);
-}
+#game.enhanced-graphics .turn-info { padding: 14px; }
 #game.enhanced-graphics .turn-player {
-  color: var(--enhanced-left);
-  font-size: 27px;
+  color: #fff;
+  font: 900 26px 'Exo 2', sans-serif;
   text-transform: uppercase;
 }
-#game.enhanced-graphics .turn-sub { color: rgba(235,245,255,.74); }
+#game.enhanced-graphics .turn-player.cpu-turn { color: var(--ew-dim); }
+#game.enhanced-graphics .turn-sub { color: var(--ew-dim); font-size: 13px; }
+
 #game.enhanced-graphics .dart-slots {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
 }
 #game.enhanced-graphics .dart-slot {
-  min-height: 54px;
+  min-height: 62px;
   padding: 8px 6px;
   flex-direction: column;
   justify-content: center;
-  background: rgba(255,255,255,.035);
-  border: 1px solid rgba(170,190,215,.18);
+  gap: 4px;
+  background: rgba(255,255,255,.04);
+  border: 1px solid var(--ew-line);
+  border-radius: 8px;
 }
-#game.enhanced-graphics .dart-slot-label { font-size: 10px; letter-spacing: 1px; }
+#game.enhanced-graphics .dart-slot.hit    { border-color: var(--ew-blue); }
+#game.enhanced-graphics .dart-slot.scored { border-color: var(--ew-amber); }
+#game.enhanced-graphics .dart-slot.miss   { border-color: var(--ew-red); }
+#game.enhanced-graphics .dart-slot-label { font-size: 10px; letter-spacing: 1.5px; }
 #game.enhanced-graphics .dart-slot-val {
   width: auto;
   text-align: center;
-  font-size: 19px;
-}
-#game.enhanced-graphics .target-box,
-#game.enhanced-graphics .round-box {
-  padding: 10px;
-}
-#game.enhanced-graphics .target-val,
-#game.enhanced-graphics .round-num {
-  color: var(--enhanced-left);
-  font-size: 38px;
-}
-#game.enhanced-graphics .keypad-wrap {
-  margin-top: auto;
-  padding: 8px;
-}
-#game.enhanced-graphics .kp-btn {
-  background: rgba(255,255,255,.045);
-  border: 1px solid rgba(170,190,215,.16);
-  color: #f7fbff;
-  min-height: 34px;
-  padding: 6px 0;
-  font-size: 12px;
-}
-#game.enhanced-graphics .kp-btn:hover,
-#game.enhanced-graphics .kp-mod.active {
-  border-color: var(--enhanced-left);
-  color: var(--enhanced-left);
-  box-shadow: 0 0 14px rgba(242,184,75,.16);
-}
-#game.enhanced-graphics .game-ws {
-  position: absolute;
-  left: -50vw;
-  right: -50vw;
-  bottom: -62px;
-  height: 48px;
-  padding-left: calc(50vw - 140px);
-  display: flex;
-  align-items: center;
-  background: rgba(9,15,22,.86);
-  border: 1px solid rgba(170,190,215,.22);
-  border-radius: 12px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
 }
 
+#game.enhanced-graphics .target-box,
+#game.enhanced-graphics .round-box { padding: 10px; }
+#game.enhanced-graphics .target-box { border-color: rgba(255,185,56,.5); }
+#game.enhanced-graphics .target-label,
+#game.enhanced-graphics .round-sub { font-size: 10px; letter-spacing: 2px; color: var(--ew-dim); }
+#game.enhanced-graphics .target-val {
+  color: var(--ew-amber);
+  font-size: clamp(34px, 2.4vw, 44px);
+  margin-top: 2px;
+}
+#game.enhanced-graphics .round-num {
+  color: #fff;
+  font-size: clamp(34px, 2.4vw, 44px);
+}
+
+#game.enhanced-graphics .variant-badge {
+  letter-spacing: 4px;
+  font-size: 11px;
+  color: var(--ew-dim);
+  padding: 9px;
+}
+
+/* Keypad absorbs all remaining vertical space — big touch targets */
+#game.enhanced-graphics .keypad-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  margin-top: 0;
+}
+#game.enhanced-graphics .keypad-row { flex: 1; display: flex; gap: 8px; }
+#game.enhanced-graphics .kp-btn {
+  height: 100%;
+  min-height: 34px;
+  padding: 0;
+  background: rgba(255,255,255,.05);
+  border: 1px solid var(--ew-line);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 800;
+}
+#game.enhanced-graphics .kp-btn:hover { border-color: var(--ew-blue); color: var(--ew-blue); }
+#game.enhanced-graphics .kp-miss { color: var(--ew-dim); }
+#game.enhanced-graphics .kp-miss:hover { border-color: var(--ew-red); color: var(--ew-red); }
+#game.enhanced-graphics .kp-mod.active {
+  background: var(--ew-amber);
+  border-color: var(--ew-amber);
+  color: var(--ew-ink);
+  box-shadow: none;
+}
+#game.enhanced-graphics .kp-undo { border-color: rgba(255,185,56,.55); color: var(--ew-amber); }
+
+#game.enhanced-graphics .end-btn {
+  padding: 10px;
+  border: 1px solid var(--ew-line);
+  border-radius: 8px;
+  background: rgba(255,255,255,.03);
+  color: var(--ew-dim);
+  font-size: 12px;
+}
+#game.enhanced-graphics .end-btn:hover { border-color: var(--ew-red); color: var(--ew-red); }
+
+/* WS status: thin strip below the board */
+#game.enhanced-graphics .game-ws {
+  position: absolute;
+  left: 50%;
+  bottom: -58px;
+  transform: translateX(-50%);
+  width: calc(100vw - 40px);
+  height: 44px;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: var(--ew-panel);
+  border: 1px solid var(--ew-line);
+  border-radius: 10px;
+}
+
+/* ── SMALL SCREENS (functional fallback, not the target display) ── */
 @media (max-width: 980px) {
   #game.enhanced-graphics {
-    padding: 72px 10px 14px;
+    padding: 78px 10px 14px;
     overflow: auto;
   }
   #game.enhanced-graphics .enhanced-topbar {
     left: 10px; right: 10px;
     grid-template-columns: 1fr;
   }
-  #game.enhanced-graphics .enhanced-brand,
-  #game.enhanced-graphics .enhanced-icons { display: none; }
-  #game.enhanced-graphics .enhanced-match-strip { grid-template-columns: 1fr 1.2fr 1fr; }
+  #game.enhanced-graphics .enhanced-brand { display: none; }
   #game.enhanced-graphics #scoreboard {
     min-height: 0;
     height: auto;
-    grid-template-rows: 150px auto;
+    grid-template-rows: 170px auto;
   }
   #game.enhanced-graphics .sb-top,
   #game.enhanced-graphics .sb-body {
     grid-template-columns: minmax(130px, 1fr) 96px minmax(130px, 1fr) !important;
-    gap: 8px;
+    column-gap: 8px;
   }
-  #game.enhanced-graphics .sb-player-hdr { padding: 18px 14px; }
-  #game.enhanced-graphics .sb-score-big { font-size: 52px !important; }
-  #game.enhanced-graphics .sb-mark-cell,
-  #game.enhanced-graphics .sb-num-cell { min-height: 46px; }
+  #game.enhanced-graphics .sb-player-hdr { grid-template-rows: 40px 1fr 40px; }
+  #game.enhanced-graphics .sb-pname { padding: 0 12px 4px; font-size: 16px !important; }
+  #game.enhanced-graphics .sb-player-hdr.active-col .sb-pname::after { display: none; }
+  #game.enhanced-graphics .sb-score-big { font-size: 56px !important; }
+  #game.enhanced-graphics .sb-mark-cell { grid-template-columns: minmax(0,1fr) 44px; }
+  #game.enhanced-graphics .sb-mark-cell[id$="-1"] { grid-template-columns: 44px minmax(0,1fr); }
+  #game.enhanced-graphics .sb-mark-cell::before { font-size: 16px; }
   #game.enhanced-graphics .mark-wrap { padding: 4px 6px; }
   #game.enhanced-graphics #side-panel {
     position: relative;
@@ -522,6 +557,8 @@
   }
   #game.enhanced-graphics .game-ws {
     position: static;
+    transform: none;
+    width: auto;
     height: auto;
     padding: 8px;
   }
@@ -887,4 +924,126 @@
 @keyframes arcadeWaveIn {
   from { opacity: 0; transform: scale(.4); }
   to   { opacity: 1; transform: scale(1); }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ENHANCED WINNER TAKEOVER
+   Applied via body.enhanced-winner (set by cricket.js only when
+   Enhanced Graphics is active for the finished leg). ew-p1 marks
+   the right/blue player as the winner; default accent is amber.
+   Pure visual overrides of the standard winner screen — removing
+   the class restores the stock look exactly.
+   ═══════════════════════════════════════════════════════════ */
+body.enhanced-winner #winner {
+  background: linear-gradient(180deg, #182a45, #0c1626 72%);
+}
+body.enhanced-winner #winner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 26%, rgba(255,185,56,.18), transparent 58%);
+}
+body.enhanced-winner.ew-p1 #winner::before {
+  background: radial-gradient(ellipse at 50% 26%, rgba(56,177,255,.2), transparent 58%);
+}
+body.enhanced-winner .winner-layout { position: relative; z-index: 1; }
+body.enhanced-winner .win-card {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  border-radius: 0;
+  padding: 28px 0 10px;
+  animation: none;
+}
+body.enhanced-winner .win-trophy { display: none; }
+body.enhanced-winner .win-label {
+  display: inline-block;
+  background: #ffb938;
+  color: #0a0c10;
+  font: 900 16px 'Exo 2', sans-serif;
+  letter-spacing: 8px;
+  text-indent: 8px;      /* visually recentres letter-spaced caps */
+  padding: 10px 22px 9px;
+  border-radius: 4px;
+  margin-bottom: 22px;
+  transform: skewX(-8deg);
+  animation: ewKick .45s cubic-bezier(.22,1,.36,1) both;
+}
+body.enhanced-winner.ew-p1 .win-label { background: #38b1ff; }
+body.enhanced-winner .win-name {
+  font-family: 'Exo 2', sans-serif;
+  font-weight: 900;
+  font-size: clamp(64px, 11vw, 150px);
+  line-height: .95;
+  text-transform: uppercase;
+  letter-spacing: -1px;
+  color: #fff;
+  text-shadow: 0 6px 0 rgba(0,0,0,.32);
+  animation: ewName .55s .12s cubic-bezier(.22,1,.36,1) both;
+}
+body.enhanced-winner .win-name::after {
+  content: "";
+  display: block;
+  width: 38%;
+  height: 10px;
+  margin: 20px auto 0;
+  background: #ffb938;
+  transform: skewX(-8deg);
+}
+body.enhanced-winner.ew-p1 .win-name::after { background: #38b1ff; }
+body.enhanced-winner .win-score {
+  color: rgba(222,234,246,.85);
+  font-size: 19px;
+  animation: ewUp .5s .3s cubic-bezier(.22,1,.36,1) both;
+}
+body.enhanced-winner #win-others,
+body.enhanced-winner #win-session,
+body.enhanced-winner .winner-layout .setup-card,
+body.enhanced-winner .win-buttons {
+  animation: ewUp .5s .42s cubic-bezier(.22,1,.36,1) both;
+}
+body.enhanced-winner .win-other-card {
+  background: #16263d;
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 10px;
+}
+body.enhanced-winner #win-session { color: #ffb938; }
+body.enhanced-winner.ew-p1 #win-session { color: #38b1ff; }
+body.enhanced-winner .winner-layout .setup-card {
+  background: #121f33;
+  border: 1px solid rgba(255,255,255,.14);
+}
+body.enhanced-winner .win-btn {
+  background: #16263d;
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 10px;
+  color: #f7fbff;
+}
+body.enhanced-winner .win-btn-primary {
+  background: #ffb938;
+  border-color: #ffb938;
+  color: #0a0c10;
+  font-weight: 700;
+}
+body.enhanced-winner.ew-p1 .win-btn-primary {
+  background: #38b1ff;
+  border-color: #38b1ff;
+}
+body.enhanced-winner .win-btn-primary:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(0,0,0,.4);
+  filter: brightness(1.08);
+}
+@keyframes ewKick {
+  from { opacity: 0; transform: translateY(-34px) skewX(-8deg); }
+  to   { opacity: 1; transform: translateY(0) skewX(-8deg); }
+}
+@keyframes ewName {
+  from { opacity: 0; transform: scale(.86) translateY(20px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes ewUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
 }

@@ -373,6 +373,16 @@ function applyEnhancedGraphics() {
   const gameEl = document.getElementById('game');
   if (gameEl) gameEl.classList.toggle('enhanced-graphics', enhancedActive());
 }
+// Winner-screen takeover (purely visual): body.enhanced-winner themes the
+// standard #winner screen; ew-p1 switches the accent to the blue (right)
+// player. Cleared on every path that leaves the winner screen.
+function setEnhancedWinner(winnerIdx) {
+  document.body.classList.toggle('enhanced-winner', enhancedActive());
+  document.body.classList.toggle('ew-p1', enhancedActive() && winnerIdx === 1);
+}
+function clearEnhancedWinner() {
+  document.body.classList.remove('enhanced-winner', 'ew-p1');
+}
 function setEnhancedGraphics(val) {
   enhancedGraphics = val;
   applyEnhancedGraphics();
@@ -841,6 +851,7 @@ function _arcadeSetupCpu() {
 function launchLeg(){
   if (window._cpuAutoTimer) { clearInterval(window._cpuAutoTimer); window._cpuAutoTimer = null; }
   if (takeoutTimer) { clearTimeout(takeoutTimer); takeoutTimer = null; }
+  clearEnhancedWinner();
   arcadeWaitingForTakeout = false;
   if (arcadeWaveTimer) { clearTimeout(arcadeWaveTimer); arcadeWaveTimer = null; }
   cancelSpeech();
@@ -868,6 +879,8 @@ function launchLeg(){
   turnsCompleted = 0;
   gameId = crypto.randomUUID();
   buildScoreboard();
+  const evt = document.getElementById('enhanced-variant-top');
+  if (evt) evt.textContent = gameVariant.toUpperCase();
   showScreen('game');
   applyEnhancedGraphics();
   enterFullscreen();
@@ -901,6 +914,7 @@ function nextLeg(){
 
 function goToMenu(){
   if (window._cpuAutoTimer) { clearInterval(window._cpuAutoTimer); window._cpuAutoTimer = null; }
+  clearEnhancedWinner();
   gameActive = false;
   stopWinMusic();
   exitFullscreen();
@@ -1107,19 +1121,18 @@ function drawMarkSVG(marks, canScore = false){
   return svg;
 }
 
+// Enhanced pips: three solid "lamp" blocks that light up left-to-right.
+// Solid fills (currentColor = the cell's amber/blue) read at distance and
+// survive sun-lit LCD glare in a way thin strokes and glows don't. CSS in
+// cricket.css colours .filled/.empty and switches filled lamps to green
+// when the svg carries the .scoring class.
 function drawEnhancedMarkSVG(marks, canScore = false){
   const filled = Math.max(0, Math.min(3, Number(marks) || 0));
   const scoringClass = canScore ? ' scoring' : '';
-  const pips = [0,1,2].map(i => {
-    const cls = i < filled ? 'filled' : 'empty';
-    const x = 18 + i * 30;
-    return `<g class="${cls}" transform="translate(${x} 28)">
-      <circle r="11"></circle>
-      <circle r="5"></circle>
-      <path d="M-15 0H-6M6 0H15M0-15V-6M0 6V15"></path>
-    </g>`;
-  }).join('');
-  return `<svg class="enhanced-mark-svg${scoringClass}" viewBox="0 0 96 56" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">${pips}</svg>`;
+  const pips = [0,1,2].map(i =>
+    `<rect class="${i < filled ? 'filled' : 'empty'}" x="${i * 42 + 1}" y="2" width="36" height="36" rx="7"></rect>`
+  ).join('');
+  return `<svg class="enhanced-mark-svg${scoringClass}" viewBox="0 0 122 40" xmlns="http://www.w3.org/2000/svg">${pips}</svg>`;
 }
 
 // =============================================
@@ -1784,6 +1797,7 @@ async function endWithWinner(idx){
     return;
   }
   const winner = players[idx];
+  setEnhancedWinner(idx);
   if (!testMode && sfxEnabled) playWinMusic();
   if (!testMode && voiceEnabled) speak(`${playerCallName(winner)} wins!`, true);
   const mprOf = p => p.dartsThrown >= 3
@@ -2022,6 +2036,7 @@ function endGame(){
   if (arcadeWaveTimer) { clearTimeout(arcadeWaveTimer); arcadeWaveTimer = null; }
   arcadeWaitingForTakeout = false;
   advancing = false;
+  clearEnhancedWinner();
   stopWinMusic();
   flushThrowsToNeon();
   exitFullscreen();
