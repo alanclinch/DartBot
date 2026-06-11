@@ -54,7 +54,7 @@
       </label>
       <label class="setting-row">
         <input type="checkbox" id="enhanced-graphics-toggle" onchange="setEnhancedGraphics(this.checked)">
-        <span>Enhanced Graphics</span>
+        <span>Enhanced Graphics <small style="color:var(--muted);opacity:.6;font-size:11px;">(2-player)</small></span>
       </label>
       <label class="setting-row">
         <input type="checkbox" id="test-mode-toggle" onchange="setTestMode(this.checked)">
@@ -64,7 +64,7 @@
     <div class="setting-actions">
       <button class="setting-action-btn" onclick="window.location.href='../index.html'">Main Menu</button>
       <button class="setting-action-btn" onclick="showStatsModal()">View Stats</button>
-      <button class="setting-action-btn" onclick="promptNeonString()">Connect DB</button>
+      <button class="setting-action-btn" id="connect-db-btn" onclick="promptNeonString()" style="display:none;">Connect DB</button>
     </div>
   </div>
 </div>
@@ -330,6 +330,6 @@
   <div class="be-main" id="be-main"></div>
   <div class="be-sub" id="be-sub"></div>
 </div>
-<script src="../assets/js/cricket.js?v=7"></script>
+<script src="../assets/js/cricket.js?v=8"></script>
 </body>
 </html>

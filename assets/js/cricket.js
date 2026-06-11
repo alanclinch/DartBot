@@ -57,7 +57,17 @@ function renderFlag(code) {
 const LS_KEY = 'dartbot_players';
 let sql = null;
 
+// Cloud stats (Neon) are opt-in. A public deployment leaves DARTBOT_CONFIG
+// undefined, so neonEnabled() is false and no cloud code path ever runs:
+// no esm.sh import, no connection prompt, no console chatter. The personal
+// deployment opts in with `window.DARTBOT_CONFIG = { neonEnabled: true }`
+// (same global pokemon.js uses for remotePokemonSprites).
+function neonEnabled() {
+  return !!(window.DARTBOT_CONFIG && window.DARTBOT_CONFIG.neonEnabled === true);
+}
+
 async function initNeonDB() {
+  if (!neonEnabled()) return;
   try {
     const { neon } = await import('https://esm.sh/@neondatabase/serverless');
     const connString = localStorage.getItem('neon_db_string');
@@ -147,6 +157,7 @@ async function loadStatsFromCloud() {
 }
 
 function promptNeonString() {
+  if (!neonEnabled()) return;
   const current = localStorage.getItem('neon_db_string') || '';
   const res = prompt("Enter your Neon Database Connection String:\n(Leave blank to play offline)", current);
   if (res !== null) {
@@ -351,9 +362,16 @@ function setSfx(val) {
   sfxEnabled = val;
   try { localStorage.setItem('dartbot_sfx', val ? '1' : '0'); } catch {}
 }
+// The enhanced (broadcast) layout is built around a 2-player left/right card
+// split — the CSS uses :last-child and [id$="-1"] selectors that only make
+// sense with exactly two players. For 3–4 players it would render broken, so
+// the mode goes fully inert and the game falls back to the standard look.
+function enhancedActive() {
+  return enhancedGraphics && players.length === 2;
+}
 function applyEnhancedGraphics() {
   const gameEl = document.getElementById('game');
-  if (gameEl) gameEl.classList.toggle('enhanced-graphics', enhancedGraphics);
+  if (gameEl) gameEl.classList.toggle('enhanced-graphics', enhancedActive());
 }
 function setEnhancedGraphics(val) {
   enhancedGraphics = val;
@@ -1069,7 +1087,7 @@ function updateScoreboard(){
 }
 
 function drawMarkSVG(marks, canScore = false){
-  if (enhancedGraphics) return drawEnhancedMarkSVG(marks, canScore);
+  if (enhancedActive()) return drawEnhancedMarkSVG(marks, canScore);
   if(marks === 0) return '';
   const s = 60, cx = s/2, cy = s/2, r = s*0.38;
   let svg = `<svg viewBox="0 0 ${s} ${s}" width="100%" height="100%" style="max-height:60px;" xmlns="http://www.w3.org/2000/svg">`;
@@ -1671,27 +1689,46 @@ function checkWin(idx){
 // ── Game record ─────────────────────────────────────────────
 async function saveGameToNeon(winnerIdx) {
   if (!sql) return;
-  const winner = players[winnerIdx];
+  // Snapshot all game state synchronously up front. endWithWinner now shows the
+  // winner screen before awaiting this save, so a fast "Next Leg" / CPU auto-
+  // advance could call launchLeg() and reset gameId + player scores while these
+  // awaits are still in flight. Capturing values now keeps the saved record
+  // consistent with the leg that just finished.
+  const gId = gameId;
+  const variant = gameVariant;
+  const leg = legNumber;
+  const sessionKey = getSessionKey();
+  const testSid = testSuite ? testSuite.sessionId : null;
   const totalRounds = Math.ceil(turnsCompleted / players.length);
+  const winnerName = players[winnerIdx] ? players[winnerIdx].name : null;
+  const snap = players.map((p, i) => ({
+    name: p.name,
+    isCpu: p.isCpu,
+    targetMpr: p.isCpu && p.cpuData ? p.cpuData.mpr : null,
+    cpuId: p.isCpu && p.cpuData ? p.cpuData.id : null,
+    finalMpr: p.dartsThrown >= 3 ? p.marksThrown / (p.dartsThrown / 3) : null,
+    marksThrown: p.marksThrown,
+    dartsThrown: p.dartsThrown,
+    score: p.score,
+    won: i === winnerIdx
+  }));
   try {
-    const testSid = testSuite ? testSuite.sessionId : null;
     await sql`
       INSERT INTO games (game_id, variant, leg_number, session_id, winner_name, total_rounds, test_session_id)
-      VALUES (${gameId}, ${gameVariant}, ${legNumber}, ${getSessionKey()}, ${winner.name}, ${totalRounds}, ${testSid})
+      VALUES (${gId}, ${variant}, ${leg}, ${sessionKey}, ${winnerName}, ${totalRounds}, ${testSid})
       ON CONFLICT (game_id) DO NOTHING
     `;
-    for (const p of players) {
-      const finalMpr = p.dartsThrown >= 3 ? p.marksThrown / (p.dartsThrown / 3) : null;
+    for (const s of snap) {
       await sql`
         INSERT INTO game_players (game_id, player_name, is_cpu, target_mpr, final_mpr, marks_thrown, darts_thrown, final_score, won)
-        VALUES (${gameId}, ${p.name}, ${p.isCpu}, ${p.isCpu ? p.cpuData.mpr : null}, ${finalMpr ?? null}, ${p.marksThrown}, ${p.dartsThrown}, ${p.score}, ${p === winner})
+        VALUES (${gId}, ${s.name}, ${s.isCpu}, ${s.targetMpr}, ${s.finalMpr ?? null}, ${s.marksThrown}, ${s.dartsThrown}, ${s.score}, ${s.won})
         ON CONFLICT DO NOTHING
       `;
-      if (p.isCpu && p.cpuData) {
-        await sql`UPDATE players SET target_mpr = ${p.cpuData.mpr}, cpu_id = ${p.cpuData.id} WHERE name = ${p.name}`;
+      if (s.isCpu && s.cpuId) {
+        await sql`UPDATE players SET target_mpr = ${s.targetMpr}, cpu_id = ${s.cpuId} WHERE name = ${s.name}`;
       }
     }
-    console.log(`✅ Game ${gameId} saved to Neon.`);
+    console.log(`✅ Game ${gId} saved to Neon.`);
   } catch (e) { console.error('Neon DB Error (Game):', e); }
 }
 
@@ -1769,14 +1806,6 @@ async function endWithWinner(idx){
       <div class="win-other-score" style="font-size:13px;margin-top:4px;">${statsOf(p)}</div>
     </div>`)
     .join('');
-  try {
-    await Promise.all(players.map((p, i) => {
-      if (testMode && !p.isCpu) return Promise.resolve();
-      return savePlayerStat(p.name, p.flag, i === idx, p.marksThrown, p.dartsThrown, p.isCpu);
-    }));
-    await flushThrowsToNeon();
-    await saveGameToNeon(idx);
-  } catch(e) { console.error('Save error:', e); }
 
   // Session tracking
   const key = getSessionKey();
@@ -1803,6 +1832,10 @@ async function endWithWinner(idx){
   }
 
   if (!testMode) spawnConfetti();
+  // Show the winner screen synchronously, BEFORE awaiting the cloud saves
+  // below. If the saves were awaited first, a fast "Next Leg" tap during a
+  // slow Neon round-trip could start a new leg and then this showScreen would
+  // slam the winner screen back over the live game. (Same fix as Demolish.)
   showScreen('winner');
 
   // CPU vs CPU: auto-advance to next leg after countdown
@@ -1829,6 +1862,24 @@ async function endWithWinner(idx){
       }
     }, 1000);
   }
+
+  // Persist stats LAST, after the UI is already up. These awaits can be slow
+  // on a real Neon connection; keeping them off the critical path means the
+  // winner screen never waits on the network. Kick all three off synchronously
+  // first so each captures the finished-leg state before any await yields — a
+  // fast Next Leg / auto-advance can call launchLeg() and reset the live state
+  // (gameId, scores, pendingThrowsToSave) while these are in flight.
+  const statPromises = players.map((p, i) => {
+    if (testMode && !p.isCpu) return Promise.resolve();
+    return savePlayerStat(p.name, p.flag, i === idx, p.marksThrown, p.dartsThrown, p.isCpu);
+  });
+  const flushPromise = flushThrowsToNeon();
+  const gamePromise = saveGameToNeon(idx);
+  try {
+    await Promise.all(statPromises);
+    await flushPromise;
+    await gamePromise;
+  } catch(e) { console.error('Save error:', e); }
 }
 
 // =============================================
@@ -1962,6 +2013,15 @@ async function loadArcadeLeaderboard() {
 
 function endGame(){
   gameActive = false;
+  // Clear every pending timer — endGame returns to the setup screen on the
+  // same page (unlike goToMenu, which navigates away), so stray callbacks
+  // would otherwise survive. Mirrors the cleanup at the top of launchLeg().
+  if (window._cpuAutoTimer) { clearInterval(window._cpuAutoTimer); window._cpuAutoTimer = null; }
+  if (takeoutTimer) { clearTimeout(takeoutTimer); takeoutTimer = null; }
+  if (missTimer) { clearTimeout(missTimer); missTimer = null; }
+  if (arcadeWaveTimer) { clearTimeout(arcadeWaveTimer); arcadeWaveTimer = null; }
+  arcadeWaitingForTakeout = false;
+  advancing = false;
   stopWinMusic();
   flushThrowsToNeon();
   exitFullscreen();
@@ -2089,6 +2149,9 @@ document.addEventListener('DOMContentLoaded', () => {
   if (scb) scb.checked = sfxEnabled;
   if (ecb) ecb.checked = enhancedGraphics;
   applyEnhancedGraphics();
+  // Cloud DB is opt-in — only surface the Connect DB button when enabled.
+  const dbBtn = document.getElementById('connect-db-btn');
+  if (dbBtn && neonEnabled()) dbBtn.style.display = '';
   initNeonDB();
   buildCpuGrid();
   renderRecentPlayers();
