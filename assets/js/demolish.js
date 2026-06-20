@@ -573,6 +573,7 @@ let autoAdvanceTimer = null;
 let startingPlayer = 0;
 let legNumber = 0;
 let gameSession = null;
+let lastResult = null;  // snapshot of the just-finished leg, so "Back to Game" can reverse a false win
 let throwLog = []; // raw WS throws captured for the debug modal
 
 function getSessionKey() {
@@ -707,6 +708,7 @@ function newGame() {
 function startGame() {
   stopWinMusic();
   winLocked = false;
+  lastResult = null;
   throwLog = [];
   startScore = _score * _mult;
   players = setupPlayers.map((p, i) => ({
@@ -1824,6 +1826,19 @@ async function showWin(w) {
   lockWinAndPlayMusic();
   spawnConfetti();
 
+  // Snapshot for "Back to Game" — only when a human just checked out (the one
+  // case with a single misread dart to undo). Excludes CPU wins, sudden death,
+  // and last-player-standing (where the winner isn't the current thrower).
+  const _wi = players.indexOf(w);
+  const _canBack = !w.isCpu && _wi === cp && darts.length > 0 && !sdActive;
+  const _backBtn = document.getElementById('back-to-game-btn');
+  if (_backBtn) _backBtn.style.display = _canBack ? '' : 'none';
+  lastResult = _canBack ? {
+    winnerIdx: _wi,
+    players: players.map(p => ({ name: p.name, isCpu: p.isCpu, won: p === w, points: startScore - p.score, darts: p.totalDartsThrown })),
+    savePromise: Promise.resolve()
+  } : null;
+
   document.getElementById('win-name').textContent = w.name;
   document.getElementById('win-name').style.color = w.color;
   const scoreEl = document.getElementById('win-score');
@@ -1889,13 +1904,81 @@ async function showWin(w) {
     }, 1000);
   }
 
-  try {
-    for (const p of players) {
-      const won = p === w;
-      const pts = startScore - p.score;
-      await saveX01Stat(p.name, p.flag, won, pts, p.totalDartsThrown, p.isCpu);
-    }
-  } catch(e) { console.error('Save error:', e); }
+  // Fire all saves together and expose a combined promise so Back to Game can
+  // wait for them to settle before reversing (prevents reversal racing insert).
+  const statPromises = players.map(p =>
+    saveX01Stat(p.name, p.flag, p === w, startScore - p.score, p.totalDartsThrown, p.isCpu));
+  if (lastResult) lastResult.savePromise = Promise.allSettled(statPromises);
+  try { await Promise.all(statPromises); } catch(e) { console.error('Save error:', e); }
+}
+
+// ── "Back to Game" — undo a false win from a board misread ──
+// The board can misread a human dart (e.g. read a single as a double) and
+// trigger a checkout/win with no way back. Back to Game reverses what showWin
+// credited and drops back into the live game with the winning dart undone.
+// Demolish saves only per-player X01 stats (no per-game/throws record) so the
+// reversal is just the stat accumulation + the in-session series. The win also
+// flips checkedOut/winLocked/gameActive and the victory volley demolishes the
+// loser's tower visually — all undone here. Only offered for a human checkout
+// win (gated in showWin); CPU wins are simulated, and SD / last-player-standing
+// are excluded.
+function reverseX01StatLocal(s) {
+  if (s.isCpu) return;
+  const all = getSavedPlayers();
+  if (!all[s.name]) return;
+  all[s.name].x01_games  = Math.max(0, (all[s.name].x01_games  || 0) - 1);
+  if (s.won) all[s.name].x01_wins = Math.max(0, (all[s.name].x01_wins || 0) - 1);
+  all[s.name].x01_points = Math.max(0, (all[s.name].x01_points || 0) - s.points);
+  all[s.name].x01_darts  = Math.max(0, (all[s.name].x01_darts  || 0) - s.darts);
+  try { localStorage.setItem(LS_KEY, JSON.stringify(all)); } catch {}
+}
+function reverseX01StatNeon(s) {
+  if (!sql) return;
+  sql`UPDATE players SET
+        x01_games  = GREATEST(0, COALESCE(x01_games,0)  - 1),
+        x01_wins   = GREATEST(0, COALESCE(x01_wins,0)   - ${s.won ? 1 : 0}),
+        x01_points = GREATEST(0, COALESCE(x01_points,0) - ${s.points}),
+        x01_darts  = GREATEST(0, COALESCE(x01_darts,0)  - ${s.darts})
+      WHERE name = ${s.name}`.catch(e => console.error('Neon X01 reverse:', e));
+}
+async function backFromWinner() {
+  if (!lastResult) return;
+  const r = lastResult;
+  lastResult = null;
+  stopWinMusic();
+  winLocked = false;
+  document.getElementById('confetti').innerHTML = '';
+
+  // Reverse the mistaken win's user-facing stats + series immediately.
+  r.players.forEach(s => { if (!(testMode && !s.isCpu)) reverseX01StatLocal(s); });
+  if (gameSession) {
+    const wName = r.players[r.winnerIdx] && r.players[r.winnerIdx].name;
+    if (wName && gameSession.wins[wName]) gameSession.wins[wName] = Math.max(0, gameSession.wins[wName] - 1);
+  }
+
+  // Un-win the winner and return to the live game (they were the current
+  // thrower when they checked out).
+  const wi = r.winnerIdx;
+  if (players[wi]) players[wi].checkedOut = false;
+  checkedOut = checkedOut.filter(i => i !== wi);
+  roundCheckedOut = roundCheckedOut.filter(i => i !== wi);
+  gameActive = true;
+  cp = wi;
+  turnEnded = false;
+  showScreen('game');
+
+  // Undo the winning dart (restores winner score/gems/darts + turnEnded), then
+  // resync every tower so the victory volley's demolition is reverted.
+  undoLastDart();
+  players.forEach((_, i) => { restoreGems(i); updateScore(i); });
+  highlightActive();   // resets the winner tower's "checkout" class (now un-checked-out)
+  updatePanel();
+
+  // Best-effort Neon reversal once the save has settled (avoids racing insert).
+  if (sql) {
+    try { await r.savePromise; } catch {}
+    r.players.forEach(s => reverseX01StatNeon(s));
+  }
 }
 
 function stopCpuAuto() {
@@ -1911,7 +1994,7 @@ function stopCpuAuto() {
 function skipTurn(){turnEnded=true;advanceTurn();}
 function quitGame(){
   if(confirm('Quit game?')){
-    stopWinMusic();winLocked=false;
+    stopWinMusic();winLocked=false;lastResult=null;
     clearTurnTimers();gameActive=false;sdActive=false;turnToken++;
     window.location.href='../index.html';
   }
@@ -1935,6 +2018,7 @@ function goHome(){
   if (window._cpuAutoTimer) { clearInterval(window._cpuAutoTimer); window._cpuAutoTimer = null; }
   stopWinMusic();
   winLocked = false;
+  lastResult = null;
   window.location.href='../index.html';
 }
 

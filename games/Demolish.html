@@ -11,7 +11,7 @@
 <script src="../assets/js/autodarts.js"></script>
 <script src="../assets/js/utils.js"></script>
 <script src="../assets/js/bots.js"></script>
-<script src="../assets/js/demolish.js" defer></script>
+<script src="../assets/js/demolish.js?v=2" defer></script>
 </head>
 <body>
 <div id="starfield" aria-hidden="true"></div>
@@ -269,6 +269,7 @@
     <div id="cpu-auto-msg" style="display:none;text-align:center;color:var(--muted);font-family:'Share Tech Mono',monospace;font-size:13px;padding:4px 0;"></div>
     <div class="win-buttons">
       <button class="win-btn win-btn-primary" id="next-leg-btn" onclick="nextLeg()" style="font-size:18px;padding:20px;">PLAY NEXT LEG</button>
+      <button class="win-btn" id="back-to-game-btn" onclick="backFromWinner()" style="display:none;border-color:var(--amber);color:var(--amber);">↩ BACK TO GAME</button>
       <button class="win-btn" id="cpu-stop-btn" onclick="stopCpuAuto()" style="display:none;border-color:var(--amber);color:var(--amber);">STOP AUTO</button>
       <button class="win-btn win-btn-danger" onclick="goHome()">MENU</button>
     </div>
