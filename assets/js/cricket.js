@@ -250,6 +250,7 @@ let advancing = false;
 let takeoutTimer = null;
 let gameSession = null; // { playerKeys: string, wins: {[name]: number} }
 let testSuite = null;   // when running benchmark mode — see TEST SUITE section
+let lastResult = null;  // snapshot of the just-finished game, so "Back to Game" can reverse it
 
 async function flushThrowsToNeon() {
   if (!sql || pendingThrowsToSave.length === 0) return;
@@ -852,6 +853,7 @@ function launchLeg(){
   if (window._cpuAutoTimer) { clearInterval(window._cpuAutoTimer); window._cpuAutoTimer = null; }
   if (takeoutTimer) { clearTimeout(takeoutTimer); takeoutTimer = null; }
   clearEnhancedWinner();
+  lastResult = null;
   arcadeWaitingForTakeout = false;
   if (arcadeWaveTimer) { clearTimeout(arcadeWaveTimer); arcadeWaveTimer = null; }
   cancelSpeech();
@@ -915,6 +917,7 @@ function nextLeg(){
 function goToMenu(){
   if (window._cpuAutoTimer) { clearInterval(window._cpuAutoTimer); window._cpuAutoTimer = null; }
   clearEnhancedWinner();
+  lastResult = null;
   gameActive = false;
   stopWinMusic();
   exitFullscreen();
@@ -1745,6 +1748,73 @@ async function saveGameToNeon(winnerIdx) {
   } catch (e) { console.error('Neon DB Error (Game):', e); }
 }
 
+// ── Stat reversal (for "Back to Game" on the winner screen) ──
+// A board can occasionally misread a dart (e.g. report a treble) and trigger
+// a false win. Back to Game reverses what endWithWinner credited so the game
+// can be corrected. localStorage + session are reversed synchronously (these
+// are the user-facing stats); Neon is best-effort.
+function reverseSavedStatLocal(s) {
+  if (s.isCpu) return; // CPUs aren't kept in localStorage
+  const all = getSavedPlayers();
+  if (!all[s.name]) return;
+  all[s.name].games = Math.max(0, (all[s.name].games || 0) - 1);
+  if (s.won) all[s.name].wins = Math.max(0, (all[s.name].wins || 0) - 1);
+  all[s.name].marks = Math.max(0, (all[s.name].marks || 0) - s.marks);
+  all[s.name].darts = Math.max(0, (all[s.name].darts || 0) - s.darts);
+  try { localStorage.setItem(LS_KEY, JSON.stringify(all)); } catch {}
+}
+function reverseStatNeon(s) {
+  if (!sql) return;
+  sql`UPDATE players SET
+        games = GREATEST(0, games - 1),
+        wins  = GREATEST(0, wins  - ${s.won ? 1 : 0}),
+        marks = GREATEST(0, marks - ${s.marks}),
+        darts = GREATEST(0, darts - ${s.darts})
+      WHERE name = ${s.name}`
+    .catch(e => console.error('Neon reverse stat:', e));
+}
+function reverseGameInNeon(gid) {
+  if (!sql || !gid) return;
+  sql`DELETE FROM game_players WHERE game_id = ${gid}`.catch(() => {});
+  sql`DELETE FROM throws WHERE game_id = ${gid}`.catch(() => {});
+  sql`DELETE FROM games WHERE game_id = ${gid}`.catch(() => {});
+}
+
+// Return from the winner screen to the live game, undoing the winning dart so
+// a misread result can be corrected (UNDO further / re-enter via the keypad).
+async function backFromWinner() {
+  if (!lastResult) return;
+  const r = lastResult;
+  lastResult = null;
+  stopWinMusic();
+  clearEnhancedWinner();
+  const conf = document.getElementById('confetti');
+  if (conf) conf.innerHTML = '';
+
+  // Reverse the mistaken win's user-facing stats + series immediately.
+  r.players.forEach(s => { if (!(testMode && !s.isCpu)) reverseSavedStatLocal(s); });
+  if (gameSession) {
+    const wName = r.players[r.winnerIdx] && r.players[r.winnerIdx].name;
+    if (wName && gameSession.wins[wName]) gameSession.wins[wName] = Math.max(0, gameSession.wins[wName] - 1);
+  }
+
+  // Back into the live game; undo the winning dart (single pop for a human win).
+  gameActive = true;
+  showScreen('game');
+  applyEnhancedGraphics();
+  undoLastDart();
+
+  // Corrected game records under a fresh id; best-effort wipe the false one
+  // once its save has settled (avoids racing the in-flight insert).
+  const oldGameId = r.gameId;
+  gameId = crypto.randomUUID();
+  if (sql) {
+    try { await r.savePromise; } catch {}
+    r.players.forEach(s => reverseStatNeon(s));
+    reverseGameInNeon(oldGameId);
+  }
+}
+
 // ── CPU auto-continue ────────────────────────────────────────
 function stopCpuAuto() {
   if (window._cpuAutoTimer) { clearInterval(window._cpuAutoTimer); window._cpuAutoTimer = null; }
@@ -1798,6 +1868,16 @@ async function endWithWinner(idx){
   }
   const winner = players[idx];
   setEnhancedWinner(idx);
+  // Snapshot for "Back to Game" — only offered when a human won, since a CPU
+  // win is simulated (the board only misreads human throws).
+  lastResult = {
+    winnerIdx: idx,
+    gameId,
+    players: players.map((p, i) => ({ name: p.name, isCpu: p.isCpu, won: i === idx, marks: p.marksThrown, darts: p.dartsThrown })),
+    savePromise: Promise.resolve()
+  };
+  const backBtn = document.getElementById('back-to-game-btn');
+  if (backBtn) backBtn.style.display = winner.isCpu ? 'none' : '';
   if (!testMode && sfxEnabled) playWinMusic();
   if (!testMode && voiceEnabled) speak(`${playerCallName(winner)} wins!`, true);
   const mprOf = p => p.dartsThrown >= 3
@@ -1889,11 +1969,11 @@ async function endWithWinner(idx){
   });
   const flushPromise = flushThrowsToNeon();
   const gamePromise = saveGameToNeon(idx);
-  try {
-    await Promise.all(statPromises);
-    await flushPromise;
-    await gamePromise;
-  } catch(e) { console.error('Save error:', e); }
+  // Expose a combined promise so Back to Game can wait for these to settle
+  // before it reverses them (prevents the reversal racing the insert).
+  const settled = Promise.allSettled([...statPromises, flushPromise, gamePromise]);
+  if (lastResult && lastResult.gameId === gameId) lastResult.savePromise = settled;
+  await settled;
 }
 
 // =============================================
@@ -2037,6 +2117,7 @@ function endGame(){
   arcadeWaitingForTakeout = false;
   advancing = false;
   clearEnhancedWinner();
+  lastResult = null;
   stopWinMusic();
   flushThrowsToNeon();
   exitFullscreen();
