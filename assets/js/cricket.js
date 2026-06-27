@@ -392,8 +392,11 @@ function setEnhancedGraphics(val) {
 
 function buildCpuGrid(){
   const g = document.getElementById('cpu-grid');
+  // Scale the bar to the roster's top rating so the ladder always reads as a
+  // progression, whatever range the MPRs are set to.
+  const maxMpr = Math.max(...CPU_PLAYERS.map(c => c.mpr)) || 1;
   g.innerHTML = CPU_PLAYERS.map(c => {
-    const barW = Math.round((c.mpr / 6.5) * 100);
+    const barW = Math.round((c.mpr / maxMpr) * 100);
     return `<div class="cpu-pick-card" onclick="addCpuPlayer('${c.id}')">
       <div style="width:48px; height:32px; margin-bottom:6px;">${renderFlag(c.flag)}</div>
       <div class="cpu-pick-name">${c.name}</div>

@@ -18,13 +18,13 @@
 const CPU_PLAYERS = [
   { id:'cpu0', name:'Jocky Wilson',       mpr:0.5, flag:'sco'},
   { id:'cpu1', name:'John Lowe',          mpr:0.9, flag:'eng'},
-  { id:'cpu2', name:'Eric Bristow',       mpr:1.3, flag:'eng'},
-  { id:'cpu3', name:'Peter Wright',       mpr:1.8, flag:'sco'},
-  { id:'cpu4', name:'Gary Anderson',      mpr:2.4, flag:'sco'},
-  { id:'cpu5', name:'Luke Littler',       mpr:3.0, flag:'eng'},
-  { id:'cpu6', name:'Luke Humphries',     mpr:3.7, flag:'eng'},
-  { id:'cpu7', name:'Michael van Gerwen', mpr:4.4, flag:'ned'},
-  { id:'cpu8', name:'Phil Taylor',        mpr:5.2, flag:'eng'},
+  { id:'cpu2', name:'Eric Bristow',       mpr:1.2, flag:'eng'},
+  { id:'cpu3', name:'Peter Wright',       mpr:1.4, flag:'sco'},
+  { id:'cpu4', name:'Gary Anderson',      mpr:1.6, flag:'sco'},
+  { id:'cpu5', name:'Luke Littler',       mpr:1.8, flag:'eng'},
+  { id:'cpu6', name:'Luke Humphries',     mpr:2.0, flag:'eng'},
+  { id:'cpu7', name:'Michael van Gerwen', mpr:2.2, flag:'ned'},
+  { id:'cpu8', name:'Phil Taylor',        mpr:2.4, flag:'eng'},
 ];
 
 // ── BOT TIERS ────────────────────────────────────────────────
