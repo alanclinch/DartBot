@@ -932,6 +932,7 @@ function goToMenu(){
 // SCOREBOARD BUILD
 // =============================================
 function buildScoreboard(){
+  if (testSuite) return;  // benchmark runs blank behind the progress overlay
   const n = players.length;
   const numColW = 100;
   const twoPlayer = n === 2;
@@ -1003,6 +1004,7 @@ function buildScoreboard(){
 }
 
 function updateScoreboard(){
+  if (testSuite) return;  // no board to draw during a benchmark — see buildScoreboard
   const maxScore = Math.max(...players.map(p => p.score));
 
   players.forEach((p,i) => {
@@ -1153,21 +1155,23 @@ function startTurn(){
   const nextBtn = document.getElementById('next-player-btn');
   if(nextBtn) nextBtn.style.display = 'none';
   updateScoreboard();
-  const nameEl = document.getElementById('turn-player-name');
-  const subEl = document.getElementById('turn-sub');
-  const allCpuSim = testMode && players.every(q => q.isCpu);
-  if (allCpuSim) {
-    nameEl.textContent = 'TEST MODE';
-    nameEl.style.color = 'var(--red)';
-    nameEl.classList.remove('cpu-turn');
-    subEl.textContent = `Game ${legNumber + 1}`;
-    subEl.style.color = 'var(--red)';
-  } else {
-    nameEl.textContent = p.name;
-    nameEl.style.color = '';
-    nameEl.classList.toggle('cpu-turn', p.isCpu);
-    subEl.textContent = p.isCpu ? 'Computer thinking...' : 'Throw your darts';
-    subEl.style.color = '';
+  if (!testSuite) {
+    const nameEl = document.getElementById('turn-player-name');
+    const subEl = document.getElementById('turn-sub');
+    const allCpuSim = testMode && players.every(q => q.isCpu);
+    if (allCpuSim) {
+      nameEl.textContent = 'TEST MODE';
+      nameEl.style.color = 'var(--red)';
+      nameEl.classList.remove('cpu-turn');
+      subEl.textContent = `Game ${legNumber + 1}`;
+      subEl.style.color = 'var(--red)';
+    } else {
+      nameEl.textContent = p.name;
+      nameEl.style.color = '';
+      nameEl.classList.toggle('cpu-turn', p.isCpu);
+      subEl.textContent = p.isCpu ? 'Computer thinking...' : 'Throw your darts';
+      subEl.style.color = '';
+    }
   }
   if(p.isCpu){
     setTimeout(() => runCpuTurn(), testMode ? 0 : 3000);
@@ -1206,6 +1210,7 @@ function advanceTurn(){
 }
 
 function resetDartSlots(){
+  if (testSuite) return;
   [0,1,2].forEach(i => {
     const el = document.getElementById(`ds${i}`);
     el.className = 'dart-slot';
@@ -1214,6 +1219,7 @@ function resetDartSlots(){
 }
 
 function updateDartSlot(idx, label, cssClass){
+  if (testSuite) return;
   const el = document.getElementById(`ds${idx}`);
   if(!el) return;
   el.className = `dart-slot ${cssClass}`;
@@ -2159,6 +2165,7 @@ function sfxCpuTurn(){
   noiz(t+.04,.08,.04,800,ctx);
 }
 function flash(text, color = 'var(--gold)') {
+  if (testSuite) return;
   const el = document.getElementById('announce');
   if (!el) return;
   el.textContent = text;
