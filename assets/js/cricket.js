@@ -2,6 +2,11 @@
 // PLAYER_COLORS, isMiss, segScore, dartSpeak, showScreen,
 // initSpeech, speak, gAC, tone, noiz, sfx*, spawnConfetti — from utils.js
 
+// App version — bump on each deploy. Shown on screen (corner badge) and
+// stamped into test-suite results so feedback can be pinned to exact code.
+// Placeholder 3-digit scheme for now; see CHANGELOG.md.
+const DARTBOT_VERSION = 'v001';
+
 // =============================================
 // UTILITIES
 // =============================================
@@ -771,7 +776,7 @@ function renderTestComplete() {
       }).join('')}</tbody>
     </table>
     <div class="test-complete-meta">
-      Session <code>${testSuite.sessionId.slice(0,8)}</code> · ${testSuite.completedGames} games · preset: ${TEST_PRESETS[testSuite.preset].name}
+      Session <code>${testSuite.sessionId.slice(0,8)}</code> · ${testSuite.completedGames} games · preset: ${TEST_PRESETS[testSuite.preset].name} · ${DARTBOT_VERSION}
     </div>`;
 }
 
@@ -792,7 +797,7 @@ function copyTestResults(btn) {
     .filter(b => b.games > 0)
     .sort((a, b) => a.targetMpr - b.targetMpr);
   const lines = [
-    `Cricket test suite — preset: ${TEST_PRESETS[testSuite.preset].name}, session ${testSuite.sessionId.slice(0,8)}, ${testSuite.completedGames} games`,
+    `Cricket test suite — ${DARTBOT_VERSION} · preset: ${TEST_PRESETS[testSuite.preset].name}, session ${testSuite.sessionId.slice(0,8)}, ${testSuite.completedGames} games`,
     '',
     '| Bot | Target | Actual | Stddev | Δ | Games | Win% |',
     '|---|---|---|---|---|---|---|',
@@ -2264,5 +2269,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initSpeech();
   initAutodarts(handleWS);
   checkStartBtn();
+  const vb = document.getElementById('version-badge');
+  if (vb) vb.textContent = DARTBOT_VERSION;
   window.addEventListener('resize', () => { if(gameActive) updateScoreboard(); });
 });

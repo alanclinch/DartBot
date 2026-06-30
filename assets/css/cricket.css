@@ -1093,3 +1093,17 @@ body.enhanced-winner .win-btn-primary:hover {
 @media (max-width: 980px) {
   body.enhanced-winner .win-name { font-size: clamp(44px, 10vw, 80px); }
 }
+
+/* ── VERSION BADGE ── small, muted, never blocks clicks ── */
+#version-badge {
+  position: fixed;
+  right: 7px;
+  bottom: 5px;
+  z-index: 50;
+  pointer-events: none;
+  user-select: none;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: rgba(255,255,255,.34);
+}
