@@ -5,6 +5,15 @@ COPY RESULTS. Bump `DARTBOT_VERSION` in `assets/js/cricket.js` and the
 `#version-badge` text in `games/cricket.html` together, and add an entry here.
 (Placeholder 3-digit scheme `vNNN` for now — will revisit later.)
 
+## v004 — 2026-06-30
+Standalone test bench (Phase 3, depth A).
+- `games/cricket-bench.html` → instantly redirects to `cricket.html?bench=1`,
+  which boots straight into the test config (reuses the full engine + DOM,
+  no duplication, zero risk of a missing element).
+- Suite no longer grabs fullscreen (`enterFullscreen` gated on !testSuite) —
+  benchmarks run windowed behind the progress overlay.
+Address: <deploy>/games/cricket-bench.html
+
 ## v003 — 2026-06-30
 Test-suite Phase 2: prove each play style is MPR-neutral.
 - New **Spectrum (~1000)** preset: forces every style × every bot in self-play

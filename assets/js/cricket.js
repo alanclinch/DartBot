@@ -5,7 +5,7 @@
 // App version — bump on each deploy. Shown on screen (corner badge) and
 // stamped into test-suite results so feedback can be pinned to exact code.
 // Placeholder 3-digit scheme for now; see CHANGELOG.md.
-const DARTBOT_VERSION = 'v003';
+const DARTBOT_VERSION = 'v004';
 
 // =============================================
 // UTILITIES
@@ -965,7 +965,7 @@ function launchLeg(){
   if (evt) evt.textContent = gameVariant.toUpperCase();
   showScreen('game');
   applyEnhancedGraphics();
-  enterFullscreen();
+  if (!testSuite) enterFullscreen();  // benchmark runs windowed, behind the overlay
   if (gameVariant === 'arcade' && !testMode) {
     updateScoreboard();
     showArcadeRoundSplash(arcadeWave, () => { startTurn(); });
@@ -2382,4 +2382,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const vb = document.getElementById('version-badge');
   if (vb) vb.textContent = DARTBOT_VERSION;
   window.addEventListener('resize', () => { if(gameActive) updateScoreboard(); });
+  // Bench mode: cricket.html?bench=1 boots straight into the test bench,
+  // reusing this page's full engine + DOM (decoupled entry, depth A).
+  if (location.search.includes('bench')) {
+    document.body.classList.add('bench-mode');
+    showTestConfig();
+  }
 });
