@@ -5,7 +5,7 @@
 // App version — bump on each deploy. Shown on screen (corner badge) and
 // stamped into test-suite results so feedback can be pinned to exact code.
 // Placeholder 3-digit scheme for now; see CHANGELOG.md.
-const DARTBOT_VERSION = 'v001';
+const DARTBOT_VERSION = 'v002';
 
 // =============================================
 // UTILITIES
@@ -876,6 +876,9 @@ function launchLeg(){
     p.dartsThrown = 0;
     p.marksThrown = 0;
     p.cpuMissStreak = 0;
+    // Roll a fresh play style for each CPU each leg (the default-on effect).
+    // forceStyle is reserved for the bench's per-style sweep (Phase 2).
+    p.style = p.isCpu ? (testSuite && testSuite.forceStyle ? testSuite.forceStyle : rollCricketStyle()) : null;
   });
   currentPlayer = startingPlayer;
   currentDarts = [];
@@ -1658,6 +1661,41 @@ function generateArcadeCpuDart(target, mpr) {
   return { name: mul === 1 ? `S${target}` : `D${target}`, number: target, multiplier: mul, bed: mul === 2 ? 'Double' : 'SingleOuter' };
 }
 
+// ── PLAY-STYLE EFFECT (applied by default, rolled per leg) ───
+// An additive layer on top of the untouched targeting core. Each style
+// decides ONLY one thing: "score on an open number, or close the next one?"
+// — never WHICH target — so MPR is preserved by construction (you land the
+// same marks/round either way). Scoped to the STANDARD variant; cutthroat /
+// noscore / arcade keep the base logic. With no style set (humans, or the
+// effect disabled) the original lead-and-cover rule runs unchanged — that is
+// the hard-wired base this sits on top of.
+// ctx: { lead, score, nextOpen, mpr } → returns true to prefer scoring.
+const CRICKET_STYLES = [
+  { id: 'closer',   name: 'Closer',         score: c => c.lead < 0 },     // close; score only if behind
+  { id: 'light',    name: 'Light scorer',   score: c => c.score < 30 },   // small bank, then close
+  { id: 'score50',  name: 'Score to 50',    score: c => c.score < 50 },
+  { id: 'score100', name: 'Score to 100',   score: c => c.score < 100 },
+  { id: 'ahead50',  name: 'Stay 50 ahead',  score: c => c.lead < 50 },
+  { id: 'ahead100', name: 'Stay 100 ahead', score: c => c.lead < 100 },
+  { id: 'hammer',   name: 'Hammer',         score: c => c.score < 150 },  // dad: rack a big lead, then close out
+];
+function rollCricketStyle() {
+  return CRICKET_STYLES[Math.floor(Math.random() * CRICKET_STYLES.length)].id;
+}
+function cricketStyleName(id) {
+  const s = CRICKET_STYLES.find(x => x.id === id);
+  return s ? s.name : 'Skill default';
+}
+// Default branch reproduces the original behaviour exactly.
+function cricketStyleWantsToScore(p, ctx) {
+  const style = p.isCpu ? CRICKET_STYLES.find(s => s.id === p.style) : null;
+  if (!style) {
+    const M = p.isCpu ? Math.min(5, Math.max(0, (p.cpuData.mpr - 0.5) * 2)) : 1;
+    return ctx.lead < M * ctx.nextOpen;
+  }
+  return style.score(ctx);
+}
+
 function getBestTarget(p){
   const sortHighest = (a, b) => (b === 25 ? 14 : b) - (a === 25 ? 14 : a);
   const enemies = players.filter((_, i) => i !== currentPlayer);
@@ -1685,7 +1723,10 @@ function getBestTarget(p){
 
   if (gameVariant === 'standard' && myOpen.length > 0 && myScoring.length > 0) {
     const maxEnemyScore = Math.max(0, ...enemies.map(op => op.score));
-    if (p.score - maxEnemyScore < M * myOpen[0]) return myScoring[0];
+    // Score-vs-close verdict is delegated to the per-leg play style (default
+    // = original lead-and-cover rule). Everything else here is unchanged.
+    const ctx = { lead: p.score - maxEnemyScore, score: p.score, nextOpen: myOpen[0], mpr: p.isCpu ? p.cpuData.mpr : 1 };
+    if (cricketStyleWantsToScore(p, ctx)) return myScoring[0];
   }
 
   if (gameVariant === 'cutthroat' && myOpen.length > 0 && myScoring.length > 0) {
