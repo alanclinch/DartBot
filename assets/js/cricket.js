@@ -5,7 +5,7 @@
 // App version — bump on each deploy. Shown on screen (corner badge) and
 // stamped into test-suite results so feedback can be pinned to exact code.
 // Placeholder 3-digit scheme for now; see CHANGELOG.md.
-const DARTBOT_VERSION = 'v002';
+const DARTBOT_VERSION = 'v003';
 
 // =============================================
 // UTILITIES
@@ -597,6 +597,17 @@ const TEST_PRESETS = {
       }
       return matchups;
     }
+  },
+  spectrum: {
+    name: 'Spectrum',
+    blurb: '≈1000 · every style × every bot (self-play), forced per style',
+    build: () => {
+      const matchups = [];
+      CRICKET_STYLES.forEach(style => {
+        CPU_PLAYERS.forEach(c => matchups.push({ a: c.id, b: c.id, count: 16, style: style.id }));
+      });
+      return matchups; // 7 styles × 9 bots × 16 = 1008
+    }
   }
 };
 
@@ -642,6 +653,8 @@ function startTestSuite() {
     totalGames,
     completedGames: 0,
     perBot: {},   // cpuId -> { games, wins, mprs: [] }
+    perStyle: {}, // styleId -> { [cpuId]: { games, wins, mprs:[], targetMpr } }
+    forceStyle: null,
     startedAt: Date.now()
   };
   CPU_PLAYERS.forEach(c => { testSuite.perBot[c.id] = { games: 0, wins: 0, mprs: [], targetMpr: c.mpr, name: c.name, flag: c.flag }; });
@@ -676,6 +689,7 @@ function runNextTestGame() {
       dartsThrown: 0, marksThrown: 0, cpuMissStreak: 0 }
   ];
   startingPlayer = testSuite.gameInMatchup % 2;
+  testSuite.forceStyle = mu.style || null;  // Spectrum forces a style; others roll random
   testSuite.gameInMatchup++;
   testSuite.completedGames++;
   updateTestProgress();
@@ -695,7 +709,7 @@ function updateTestProgress() {
   document.getElementById('test-progress-pct').textContent = `${pct}%`;
   document.getElementById('test-progress-bar-fill').style.width = `${pct}%`;
   document.getElementById('test-progress-match').textContent =
-    cpuA && cpuB ? `${cpuA.name} (${cpuA.mpr.toFixed(1)}) vs ${cpuB.name} (${cpuB.mpr.toFixed(1)})` : '';
+    cpuA && cpuB ? `${cpuA.name} (${cpuA.mpr.toFixed(1)}) vs ${cpuB.name} (${cpuB.mpr.toFixed(1)})${mu && mu.style ? ' · ' + cricketStyleName(mu.style) : ''}` : '';
 }
 
 function recordTestResult(winnerIdx) {
@@ -716,6 +730,22 @@ function recordTestResult(winnerIdx) {
     // Record every instance's MPR so self-play contributes two samples.
     if (p.dartsThrown >= 3) slot.mprs.push(p.marksThrown / (p.dartsThrown / 3));
   });
+  // Per-style buckets — the Spectrum breakdown. Populates for any preset; a
+  // random-style run just buckets by whatever each leg happened to roll.
+  const seenStyleKeys = new Set();
+  players.forEach((p) => {
+    const id = p.cpuData && p.cpuData.id;
+    if (!id || !p.style) return;
+    const ps = (testSuite.perStyle[p.style] = testSuite.perStyle[p.style] || {});
+    const slot = (ps[id] = ps[id] || { mprs: [], games: 0, wins: 0, targetMpr: p.cpuData.mpr, name: p.cpuData.name });
+    const key = p.style + '|' + id;
+    if (!seenStyleKeys.has(key)) {
+      slot.games++;
+      if (id === winnerId) slot.wins++;
+      seenStyleKeys.add(key);
+    }
+    if (p.dartsThrown >= 3) slot.mprs.push(p.marksThrown / (p.dartsThrown / 3));
+  });
   if (sql) {
     sql`UPDATE test_sessions SET completed_games = ${testSuite.completedGames} WHERE id = ${testSuite.sessionId}`
       .catch(() => {});
@@ -732,6 +762,27 @@ async function finishTestSuite() {
   renderTestComplete();
   showScreen('test-complete');
   // testSuite is kept around so the user can read the results screen.
+}
+
+// Aggregate per-style MPR neutrality: for each style, avg (actual − target)
+// across the bots that played it, plus the worst single-bot deviation.
+function perStyleSummary() {
+  if (!testSuite || !testSuite.perStyle) return [];
+  const mean = arr => arr.reduce((s, v) => s + v, 0) / arr.length;
+  const rows = [];
+  for (const style of CRICKET_STYLES) {
+    const ps = testSuite.perStyle[style.id];
+    if (!ps) continue;
+    let games = 0; const deltas = [];
+    for (const id in ps) {
+      const slot = ps[id];
+      games += slot.games;
+      if (slot.mprs.length) deltas.push(mean(slot.mprs) - slot.targetMpr);
+    }
+    if (!deltas.length) continue;
+    rows.push({ name: style.name, games, avgDelta: mean(deltas), worst: Math.max(...deltas.map(Math.abs)) });
+  }
+  return rows;
 }
 
 function renderTestComplete() {
@@ -753,6 +804,17 @@ function renderTestComplete() {
     if (a < 0.25) return { cls: 'tc-warn', text: '~' };
     return { cls: 'tc-bad', text: '✗' };
   };
+  const styleRows = perStyleSummary();
+  const styleTableHTML = styleRows.length ? `
+    <table class="test-table" style="margin-top:18px;">
+      <thead><tr><th>Style</th><th>Games</th><th>Avg Δ vs target</th><th>Worst |Δ|</th></tr></thead>
+      <tbody>${styleRows.map(r => { const v = verdict(r.avgDelta); return `<tr>
+        <td class="tc-name">${escapeHTML(r.name)}</td>
+        <td>${r.games}</td>
+        <td class="${v.cls}">${r.avgDelta >= 0 ? '+' : ''}${r.avgDelta.toFixed(3)} ${v.text}</td>
+        <td>${r.worst.toFixed(3)}</td>
+      </tr>`; }).join('')}</tbody>
+    </table>` : '';
   el.innerHTML = `
     <table class="test-table">
       <thead><tr>
@@ -775,6 +837,7 @@ function renderTestComplete() {
         </tr>`;
       }).join('')}</tbody>
     </table>
+    ${styleTableHTML}
     <div class="test-complete-meta">
       Session <code>${testSuite.sessionId.slice(0,8)}</code> · ${testSuite.completedGames} games · preset: ${TEST_PRESETS[testSuite.preset].name} · ${DARTBOT_VERSION}
     </div>`;
@@ -809,6 +872,12 @@ function copyTestResults(btn) {
       return `| ${r.name} | ${r.targetMpr.toFixed(1)} | ${avg.toFixed(3)} | ${sd.toFixed(3)} | ${dev >= 0 ? '+' : ''}${dev.toFixed(3)} | ${r.games} | ${winPct}% |`;
     })
   ];
+  const styleRows = perStyleSummary();
+  if (styleRows.length) {
+    lines.push('', 'Per-style (MPR neutrality — Avg Δ should be ≈0):',
+      '| Style | Games | Avg Δ | Worst |Δ| |', '|---|---|---|---|',
+      ...styleRows.map(r => `| ${r.name} | ${r.games} | ${r.avgDelta >= 0 ? '+' : ''}${r.avgDelta.toFixed(3)} | ${r.worst.toFixed(3)} |`));
+  }
   const text = lines.join('\n');
   const flash = (msg) => {
     if (!btn) return;

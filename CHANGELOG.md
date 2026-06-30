@@ -5,6 +5,17 @@ COPY RESULTS. Bump `DARTBOT_VERSION` in `assets/js/cricket.js` and the
 `#version-badge` text in `games/cricket.html` together, and add an entry here.
 (Placeholder 3-digit scheme `vNNN` for now — will revisit later.)
 
+## v003 — 2026-06-30
+Test-suite Phase 2: prove each play style is MPR-neutral.
+- New **Spectrum (~1000)** preset: forces every style × every bot in self-play
+  (7×9×16=1008), via the `forceStyle` hook, for clean per-style attribution.
+- Per-style data bucketed in `testSuite.perStyle` (works for any preset — a
+  random-style run buckets by whatever each leg rolled).
+- Results (on-screen + COPY RESULTS) now include a **per-style table**:
+  Avg Δ vs target (should be ≈0) and worst single-bot |Δ| per style.
+- Progress overlay shows the current style during a Spectrum run.
+Next: standalone bench page (depth A).
+
 ## v002 — 2026-06-30
 CPU play-style effect (Phase 1 of "more human"). Applied by default, rolled
 fresh per leg for each CPU; **MPR-neutral by construction** (styles only change
