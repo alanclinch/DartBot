@@ -5,6 +5,16 @@ COPY RESULTS. Bump `DARTBOT_VERSION` in `assets/js/cricket.js` and the
 `#version-badge` text in `games/cricket.html` together, and add an entry here.
 (Placeholder 3-digit scheme `vNNN` for now — will revisit later.)
 
+## v005 — 2026-07-01
+FIX: enhanced-graphics winner screen was never appearing. Root cause was a
+CSS specificity bug — `#game.enhanced-graphics { display:block }` (id
+selector) overrode `.screen { display:none }`, so the enhanced board stayed
+visible after a leg ended and the winner screen (stats / change players /
+new game) rendered off-screen below it. Added
+`#game.enhanced-graphics:not(.active) { display:none }` so the board hides
+when it isn't the active screen. Explains all three prior reports; earlier
+attempts restyled a screen that was rendering out of view.
+
 ## v004 — 2026-06-30
 Standalone test bench (Phase 3, depth A).
 - `games/cricket-bench.html` → instantly redirects to `cricket.html?bench=1`,

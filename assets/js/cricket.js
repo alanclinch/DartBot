@@ -5,7 +5,7 @@
 // App version — bump on each deploy. Shown on screen (corner badge) and
 // stamped into test-suite results so feedback can be pinned to exact code.
 // Placeholder 3-digit scheme for now; see CHANGELOG.md.
-const DARTBOT_VERSION = 'v004';
+const DARTBOT_VERSION = 'v005';
 
 // =============================================
 // UTILITIES

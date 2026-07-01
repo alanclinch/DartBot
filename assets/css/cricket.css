@@ -33,6 +33,10 @@
   background: linear-gradient(180deg, var(--ew-bg-hi), var(--ew-bg-lo) 72%);
   color: #f7fbff;
 }
+/* CRITICAL: the id-specificity of `display:block` above beats `.screen{display:none}`,
+   so without this the enhanced board stays visible after the leg ends and the winner
+   screen renders off-screen below it (= "no end-game screen"). Re-hide when inactive. */
+#game.enhanced-graphics:not(.active) { display: none; }
 
 /* Hidden outside enhanced mode (markup is always present) */
 .enhanced-topbar { display: none; }
