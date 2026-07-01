@@ -25,10 +25,19 @@ function _connectWS() {
   try {
     _ws = new WebSocket(url);
     _ws.onopen  = () => updateWSUI(true);
-    _ws.onmessage = e => { try { if (_wsHandler) _wsHandler(JSON.parse(e.data)); } catch(ex) {} };
+    // Flash the dot on every inbound message — a thrown dart visibly pulses
+    // the indicator, so you can tell the board pipeline is live (not frozen).
+    _ws.onmessage = e => { pulseWsDots(); try { if (_wsHandler) _wsHandler(JSON.parse(e.data)); } catch(ex) {} };
     _ws.onclose = () => { _wsIdx++; updateWSUI(false); setTimeout(_connectWS, 3000); };
     _ws.onerror = () => {};
   } catch(e) { _wsIdx++; setTimeout(_connectWS, 3000); }
+}
+
+// Retrigger the .flash animation on all connection dots.
+function pulseWsDots() {
+  document.querySelectorAll('.ws-dot.on').forEach(d => {
+    d.classList.remove('flash'); void d.offsetWidth; d.classList.add('flash');
+  });
 }
 
 function updateWSUI(on) {
@@ -36,7 +45,7 @@ function updateWSUI(on) {
   const sl = document.getElementById('setup-ws-label');
   if (sl) sl.textContent = on ? 'Autodarts: Connected' : 'Autodarts: Not Connected';
   const gl = document.getElementById('game-ws-label');
-  if (gl) gl.textContent = on ? 'Autodarts Live' : 'Manual Mode';
+  if (gl) gl.textContent = on ? 'Autodarts Live' : 'Reconnecting…';
 }
 
 function autodartsReset() {

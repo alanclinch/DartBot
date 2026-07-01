@@ -5,7 +5,7 @@
 // App version — bump on each deploy. Shown on screen (corner badge) and
 // stamped into test-suite results so feedback can be pinned to exact code.
 // Placeholder 3-digit scheme for now; see CHANGELOG.md.
-const DARTBOT_VERSION = 'v005';
+const DARTBOT_VERSION = 'v006';
 
 // =============================================
 // UTILITIES
@@ -25,6 +25,28 @@ function dartName(num, mul){
 }
 function playerCallName(p){
   return p.isCpu ? p.name.split(' ')[0] : p.name;
+}
+
+// =============================================
+// BOARD ACTIONS (reset / calibrate) with 3s feedback
+// =============================================
+// The physical reset/calibrate takes ~3s in the backend, and the fetch is
+// fire-and-forget, so drive a 3s progress fill on the button as feedback.
+function cricketBoardAction(btn, kind) {
+  if (!btn || btn.classList.contains('busy')) return;
+  const label = kind === 'calibrate' ? 'CALIBRATE' : 'RESET';
+  btn.classList.remove('done');
+  btn.classList.add('busy');
+  btn.disabled = true;
+  btn.textContent = (kind === 'calibrate' ? 'CALIBRATING' : 'RESETTING') + '…';
+  try { kind === 'calibrate' ? autodartsCalibrate() : autodartsReset(); } catch(e) {}
+  setTimeout(() => {
+    btn.classList.remove('busy');
+    btn.classList.add('done');
+    btn.disabled = false;
+    btn.textContent = '✓ ' + label;
+    setTimeout(() => { btn.classList.remove('done'); btn.textContent = label; }, 1400);
+  }, 3000);
 }
 
 // =============================================

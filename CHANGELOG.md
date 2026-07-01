@@ -5,6 +5,17 @@ COPY RESULTS. Bump `DARTBOT_VERSION` in `assets/js/cricket.js` and the
 `#version-badge` text in `games/cricket.html` together, and add an entry here.
 (Placeholder 3-digit scheme `vNNN` for now — will revisit later.)
 
+## v006 — 2026-07-01
+Board feedback + connection liveness.
+- Reset/Calibrate buttons now show a 3-second blue progress fill (matches the
+  backend time), then a ✓ — no more "did that even do anything?". Handler:
+  `cricketBoardAction`; buttons debounced while busy.
+- WS connection dot now **pulses green on every message from the board**, so a
+  thrown dart visibly flashes it = the pipeline is live/not frozen. Steady dot
+  = connected but idle. Disconnected label now reads "Reconnecting…".
+  (autodarts.js — shared; other games pick it up on their next version bump.)
+cricket.js v19, cricket.css v14, autodarts.js v3.
+
 ## v005 — 2026-07-01
 FIX: enhanced-graphics winner screen was never appearing. Root cause was a
 CSS specificity bug — `#game.enhanced-graphics { display:block }` (id
