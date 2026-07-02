@@ -61,17 +61,16 @@ backdrop. CPU difficulty comes from **`BOT_TIERS[cpuId].sigma`** (via `generateC
 
 # ⭐ Next up
 
-## 0. BUG (fix first): can't add a human — name field won't accept typing
-**User-confirmed:** the "+ Human Player" modal opens but you can't type a name. Static analysis: the
-modal markup/CSS/JS is **identical to Cricket's working version** (`#new-human-name`, shared
-`.modal-input`, auto-focus at 100ms), so it's **not an obvious code defect** — needs **browser
-reproduction** to root-cause (test on a laptop first; it may be air-mouse/TV focus behaviour).
-**Prime suspect:** Demolish's global `keydown` handler is **not gated on game state** — unlike Cricket's
-(`if(!gameActive) return`), it fires during setup and relies *solely* on an `inText` (INPUT/TEXTAREA)
-guard to protect the modal input. If focus isn't landing on the input (activeElement ≠ the input), the
-handler swallows the keys as game input and nothing reaches the field. **Do not blind-patch** — reproduce,
-confirm, then fix (hardening: gate the keydown on `!gameActive`/setup like Cricket, and/or ensure the
-input reliably focuses). This blocks human play, so it's priority zero.
+## Watch item (unconfirmed — NOT a current blocker): add-human name field
+Owner reported once that the "+ Human Player" name field wouldn't accept typing — but on re-test it
+**works on a laptop and could not be reproduced there**, so it is **not a confirmed code bug**; most
+likely board/air-mouse-specific (focus not landing) or transient. **Action: re-test on the actual
+TV / air-mouse setup**, don't chase it on a laptop. If it recurs: the modal markup/CSS/JS matches
+Cricket's working version, so the first suspect is Demolish's global `keydown` handler being **ungated
+on game state** — Cricket's returns during setup (`if(!gameActive) return`); Demolish relies solely on
+an `inText` guard, so if the input isn't focused the keys get swallowed as game input. Harden by gating
+the keydown on `!gameActive`/setup and ensuring the input reliably focuses. The two items below are the
+real priorities.
 
 ## 1. Make it more fun, vibrant & better-looking
 The owner wants Demolish to feel punchier and look better. Two levers:
