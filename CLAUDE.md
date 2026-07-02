@@ -5,6 +5,20 @@ Autodarts board, reads throws over a local WebSocket, and scores a set of darts 
 **static site — plain HTML/CSS/vanilla JS, no build step, no framework, no package.json.** Edit
 files, commit, push.
 
+## Working principles (how to work in this repo)
+1. **Ask, don't assume.** If something is unclear, ask before writing a single line — never make
+   silent assumptions about intent, architecture, or requirements. When running unattended, pick the
+   most reasonable interpretation, proceed, and record the assumption rather than blocking.
+2. **Match the solution to the problem.** Simplest solution for simple problems; a better/more robust
+   solution for harder ones. Don't over-engineer or add flexibility that isn't needed yet.
+3. **Don't touch unrelated code** — but *do* surface bad code or design smells you discover, so we can
+   address them as a separate issue.
+4. **Flag uncertainty explicitly** (see #1). Where it helps, run a small, localised, low-risk
+   experiment and bring the hypothesis + results back to discuss. Confidence without certainty causes
+   more damage than admitting a gap.
+5. **Suggest better ways.** Always open to ideas — don't hesitate to propose a better approach,
+   especially one with lasting impact over a tactical change.
+
 ## How it's deployed & used (important)
 - **GitHub Pages** serves `main` at **https://alanclinch.github.io/DartBot/**. Push to `main` →
   live in ~1 min. There is no CI/build.
