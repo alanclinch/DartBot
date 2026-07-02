@@ -30,6 +30,21 @@ files, commit, push.
   the change. After a push, hard-refresh (Ctrl+F5) on the board.
 - Verify JS with `node --check <file>` before pushing. There is no test runner.
 
+## Target environment & how it's tested (design for this!)
+- **Where it's played:** exclusively on a **1080p TV**, viewed **from across the room** (glance-able
+  at the oche), often with **window glare/reflections** on the screen. Controlled by an **i25 Rii
+  mini** — a handheld wireless mini-keyboard + air-mouse; there is **no proper keyboard/mouse at the
+  board**. Design for it: **legible at distance**, **glare-proof** (solid bright fills + dark text
+  beat subtle glows/translucency), **large forgiving hit targets** (the air-mouse is imprecise), and
+  **minimal fiddly text entry**.
+- **How the owner tests — three tiers, target the right one:**
+  1. **Bots / game logic → a laptop** (Cricket bench, `node --check`).
+  2. **Looks / visuals → a laptop emulating a 1080p TV** (1920×1080 viewport) so screenshots are easy
+     to grab and share. Design and check visual work at **1920×1080**.
+  3. **Anything needing the live board → the actual TV-connected PC**, where logs/DevTools are painful
+     (only the Rii mini, no keyboard/mouse). **Prefer on-screen diagnostics** (the version badge, the
+     WS activity pulse) over `console.log`, and keep board-side controls air-mouse-friendly.
+
 ## Repo layout
 - `index.html` — the game menu (links the 6 live games).
 - `games/<name>.html` — one HTML page per game.
