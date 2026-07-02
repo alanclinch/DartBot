@@ -38,6 +38,8 @@ files, commit, push.
 - `CHANGELOG.md` — release notes (see Versioning).
 - `Documentation/` — the original dev guide (docx/pdf) + a CPU architecture PDF. Reference material.
 - `deprecated/`, `games/x01.html` — **orphaned/old, NOT linked from index.html. Ignore them.**
+- `handover/` — per-game deep handover docs (Cricket first). **Start here for "what to work on next"
+  per game** — they carry the current state + priorities that this file only summarises.
 - `.claude/projects/.../memory/` — the persistent memory (see "Memory" below). **Read it.**
 
 ## The games
