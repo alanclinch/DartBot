@@ -48,19 +48,18 @@ let gameSession = null; // { playerKeys, wins: {name: count} }
 // =============================================
 let sql = null;
 
+// Cloud stats are opt-in (matches Cricket): requires DARTBOT_CONFIG.neonEnabled,
+// defaults off. No on-load prompt — the connection string is shared across games
+// (set once via Cricket's "Connect DB"); ATC just reads it.
+function neonEnabled() {
+  return !!(window.DARTBOT_CONFIG && window.DARTBOT_CONFIG.neonEnabled === true);
+}
 async function initNeonDB() {
+  if (!neonEnabled()) return;
+  const conn = localStorage.getItem('neon_db_string');
+  if (!conn) return;
   try {
     const { neon } = await import('https://esm.sh/@neondatabase/serverless');
-    let conn = localStorage.getItem('neon_db_string');
-    if (!conn) {
-      conn = prompt("Enter Neon connection string (blank = offline)");
-      if (conn && conn.trim()) {
-        localStorage.setItem('neon_db_string', conn.trim());
-      } else {
-        console.warn('Neon disabled');
-        return;
-      }
-    }
     sql = neon(conn);
     try { await sql`ALTER TABLE players ADD COLUMN IF NOT EXISTS flag VARCHAR(10)`; } catch(e) {}
     renderRecentPlayers();
@@ -367,8 +366,7 @@ function renderRecentPlayers() {
   lists.forEach(el => {
     if (!candidates.length) { el.innerHTML = ''; return; }
     el.innerHTML = '<div class="recent-label">Recent:</div>' + candidates.map(([name, s]) => {
-      const safeName = escapeHTML(name).replace(/'/g, "\\'");
-      return `<div class="recent-chip" onclick="addHuman('${safeName}', '${s.flag || 'sco'}')">
+      return `<div class="recent-chip" data-name="${escapeHTML(name)}" data-flag="${escapeHTML(s.flag || 'sco')}">
         ${escapeHTML(name)} <span class="chip-stat">${savedMPR(s)} MPR</span>
       </div>`;
     }).join('');
@@ -1235,6 +1233,12 @@ function handleWS(data) {
 // =============================================
 // INIT
 // =============================================
+// Recent-player chips: data-attrs + a delegated listener (apostrophe-safe names).
+document.addEventListener('click', e => {
+  const chip = e.target.closest('.recent-chip');
+  if (chip && chip.dataset.name) addHuman(chip.dataset.name, chip.dataset.flag || 'sco');
+});
+
 document.addEventListener('DOMContentLoaded', () => {
   initSpeech();
   initAutodarts(handleWS);

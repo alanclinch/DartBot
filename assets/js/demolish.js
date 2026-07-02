@@ -73,7 +73,13 @@ function voice(text, priority) { if (canVoice()) speak(text, priority); }
 
 // ══ NEON DB ══
 let sql = null;
+// Cloud stats are opt-in (matches Cricket): requires DARTBOT_CONFIG.neonEnabled,
+// defaults off for the public build.
+function neonEnabled() {
+  return !!(window.DARTBOT_CONFIG && window.DARTBOT_CONFIG.neonEnabled === true);
+}
 async function initNeonDB() {
+  if (!neonEnabled()) return;
   try {
     const { neon } = await import('https://esm.sh/@neondatabase/serverless');
     const conn = localStorage.getItem('neon_db_string');
@@ -667,7 +673,7 @@ function renderRecentPlayers() {
     suggestions.map(n => {
       const s = all[n], flag = s.flag || 'sco';
       const ppr = s.x01_darts > 0 ? (s.x01_points / (s.x01_darts/3)).toFixed(0)+' PPR' : savedMPR(s)+' MPR';
-      return `<button class="recent-chip" onclick="addHumanPlayer('${escapeHTML(n).replace(/'/g,"\\'")}','${flag}')">
+      return `<button class="recent-chip" data-name="${escapeHTML(n)}" data-flag="${escapeHTML(flag)}">
         <div style="width:22px;height:15px;">${renderFlag(flag)}</div>
         ${escapeHTML(n)}<span class="chip-stat">${ppr}</span>
       </button>`;
@@ -677,6 +683,12 @@ function renderRecentPlayers() {
   const elW = document.getElementById('recent-players-winner');
   if (elW) elW.innerHTML = html;
 }
+// Recent-player chips use data-attrs + a delegated listener so names with an
+// apostrophe (O'Brien) don't break an inline onclick.
+document.addEventListener('click', e => {
+  const chip = e.target.closest('.recent-chip');
+  if (chip && chip.dataset.name) addHumanPlayer(chip.dataset.name, chip.dataset.flag || 'sco');
+});
 
 function checkStartBtn() {
   document.getElementById('start-btn').disabled = setupPlayers.length < 2;

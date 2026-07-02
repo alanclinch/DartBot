@@ -5,6 +5,21 @@ COPY RESULTS. Bump `DARTBOT_VERSION` in `assets/js/cricket.js` and the
 `#version-badge` text in `games/cricket.html` together, and add an entry here.
 (Placeholder 3-digit scheme `vNNN` for now — will revisit later.)
 
+## Demolish + ATC — launch-blocker hardening — 2026-07-02
+(No Cricket version change.) Ported three Cricket fixes that had never reached
+the copy-pasted siblings:
+- **Apostrophe bug:** recent-player chips in Demolish + ATC now use
+  `data-name`/`data-flag` + a delegated click listener, so names like O'Brien
+  no longer break the chip.
+- **Neon gating:** both now require `DARTBOT_CONFIG.neonEnabled` (default off).
+  ATC no longer `prompt()`s for a DB connection string on page load — it reads
+  the shared `neon_db_string` set via Cricket's Connect DB.
+- **Cache-busting:** versioned all assets in both HTMLs (matching Cricket's
+  numbers for shared files: autodarts v3, utils v2, bots v7, game.css v2).
+Still open (bigger job): extract the copy-pasted shared code so fixes stop
+needing to be ported 3×. ATC MPR-label mismatch + shared-stat contamination
+also still open.
+
 ## v006 — 2026-07-01
 Board feedback + connection liveness.
 - Reset/Calibrate buttons now show a 3-second blue progress fill (matches the
