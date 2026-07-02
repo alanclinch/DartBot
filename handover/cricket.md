@@ -82,12 +82,15 @@ is closer than before but the owner says it's **still not there**.
 - **Hard constraints:** stays scoped (toggle-off = stock Cricket exactly), **2-player only**, and the
   palette must survive glare (solid bright fields + dark text beat glows/translucency — that's the
   lesson from prior iterations).
-- **Use Claude's design capability.** The owner wants to lean on it: propose **concrete visual options**
-  (generate small HTML/SVG mockups, or side-by-side previews via the question/preview mechanism) and
-  iterate rather than tweaking blind. There's a **`dataviz` skill** — use its palette/stat-tile method
-  for the MPR/MARKS/CLOSED stat strip and any coloured meters. **Ask the owner for the previous dev's
-  design brief** (sun-lit constraints, broadcast aesthetic, end-game splash) — it exists and saves
-  reinventing the constraints.
+- **Use Claude Design** (https://claude.com/product/design) — the owner specifically wants this
+  workflow, not blind CSS-tweaking. It collaborates on visual work (mockups → interactive prototypes)
+  and can **import this repo from GitHub so it builds against the real `cricket.html` / `cricket.css`
+  components**. Iterate the enhanced board + winner screen there (element comments, adjustment
+  sliders), then **sync the result back into the codebase with `/design-sync`** — the **`DesignSync`
+  tool is available here in Claude Code** for exactly that round-trip. Whatever comes back must still
+  obey the scoping rules below (toggle-off = stock Cricket, 2-player only).
+- **Ask the owner for the previous dev's design brief** (sun-lit constraints, broadcast aesthetic,
+  end-game splash) — it exists and saves reinventing the constraints; feed it into Claude Design.
 - Known rough edges the owner has called out before: dead vertical space in the central column,
   under-utilised player-card space, pips too quiet at distance, end-game screen not "splashy" enough.
 
