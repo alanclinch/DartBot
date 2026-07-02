@@ -56,8 +56,16 @@ evolve without touching the others. Don't wire Pokémon into shared changes.
 - **`game.css`** — all shared setup/modal/winner/broadcast styling + `:root` colour vars. Per-game
   CSS is game-screen-only.
 
-## The bot system (`bots.js`) — SACRED
-**Read the `bot_bible` memory before touching anything bot-related.** Summary:
+## The bot system (`bots.js`) — SACRED, tread very carefully
+> ⚠️ **The Cricket CPU bots are the crown jewel of this project.** They are the product of
+> **100+ hours of calibration** and the owner considers them among the best Cricket bots anywhere —
+> they are the single most carefully-tuned part of the codebase. **Default to findings, not edits:**
+> surface anything that looks off and let the user decide; do **not** change bot math or ratings
+> unless the user *explicitly* directs it. When you do, keep the change minimal and
+> **re-validate with the test bench every time** — a change that looks harmless can quietly shift the
+> calibrated MPRs. **Read the `bot_bible` memory before touching anything bot-related.**
+
+Summary:
 - **`CPU_PLAYERS`** — 9 named darts pros (ids `cpu0`–`cpu8`), field `mpr`. Current ladder is a
   compressed low end: `0.5, 0.9, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4`.
 - **Two difficulty dials:** `mpr` drives **Cricket** (an MPR→sigma physics formula + a "mark control"
@@ -121,7 +129,7 @@ entry, and bump the `?v=` cache-busters — all together. Currently Cricket-scop
   roster remap. Also writes its "hits"/darts into the *same* Neon `players.marks`/`darts` columns
   Cricket uses → cross-game stat contamination (Demolish avoids this via `x01_*` columns).
 - **Pokémon** still has an on-load `prompt()` Neon bug (not active dev — same fix ATC just got).
-- `GEMINI.md` at the root is empty.
+- `CLAUDE.md` and `GEMINI.md` are kept in sync (Claude/Gemini handovers) — **update both together.**
 
 ## Working style (the user's stated preferences)
 - **Planning gate:** in design discussions, stay **discussion-only until the user explicitly says to
