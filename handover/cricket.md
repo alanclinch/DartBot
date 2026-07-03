@@ -91,6 +91,11 @@ is closer than before but the owner says it's **still not there**.
   obey the scoping rules below (toggle-off = stock Cricket, 2-player only).
 - **Ask the owner for the previous dev's design brief** (sun-lit constraints, broadcast aesthetic,
   end-game splash) — it exists and saves reinventing the constraints; feed it into Claude Design.
+- **Starter files exist:** `design/enhanced-board.html` + `design/enhanced-winner.html` are
+  self-contained 1080p snapshots of the current enhanced mode (regenerate via
+  `node design/build-previews.js`). Import them into Claude Design (repo/GitHub import, or "Send to
+  Claude Code Web"). `DesignSync` can't authorize from local Claude Code — push from the Claude Design
+  side. See `design/README.md`.
 - Known rough edges the owner has called out before: dead vertical space in the central column,
   under-utilised player-card space, pips too quiet at distance, end-game screen not "splashy" enough.
 
