@@ -5,6 +5,38 @@ COPY RESULTS. Bump `DARTBOT_VERSION` in `assets/js/cricket.js` and the
 `#version-badge` text in `games/cricket.html` together, and add an entry here.
 (Placeholder 3-digit scheme `vNNN` for now — will revisit later.)
 
+## v007 — 2026-08-01
+FIX: the caller degraded during a session — intermittent delays that got worse
+as the game went on, then silence. No speech code had changed since May, so the
+trigger was almost certainly outside the repo (the board's Edge updated while
+the owner was away). The code turned that trigger into a permanent failure, so
+the fix is in how `utils.js` drives `speechSynthesis`:
+- **A stall no longer wedges the engine for the session.** `cancel()` followed by
+  `speak()` in the same tick jams Chromium until the page reloads, and two paths
+  did exactly that — the 8s watchdog, and `cancelSpeech()` (which `launchLeg`
+  calls **every leg**, usually mid "X wins!"). All cancels now go through
+  `_hardCancel()`, which blocks the next `speak()` for 250ms.
+- **Delays no longer compound.** `speaking`/`pending` read false for a moment
+  after `speak()`; trusting them that early let a second utterance stack onto the
+  engine's queue, so every later line waited behind a growing backlog. Now
+  ignored for 1.5s, and utterance-identity guards stop a late `onend` from a
+  cancelled utterance unlocking state under a newer one.
+- **Stuck state clears in the background.** A 1s watchdog reconciles between
+  calls instead of the next call paying an 8s timeout. Also un-pauses synthesis,
+  which Chromium parks when the tab is backgrounded.
+- **Cloud voices can no longer take the caller down with them.** Edge's
+  Natural/Neural voices are cloud-streamed and stop responding when their session
+  expires. After 2 stalled utterances the caller latches to a local (offline)
+  voice for the rest of the session, and clears any saved `dartbot_voice` pin —
+  there is no voice picker in the UI any more, so a stale pin was unclearable.
+- **`priority` actually interrupts now** (it silently didn't — the winner call
+  just queued behind whatever was speaking).
+Verified with a stubbed-engine harness that reproduces the failure modes: the
+pre-fix code stacks 3 utterances in the blind spot, never recovers from a wedge
+within 6s, and speaks in the same tick as the leg-restart cancel. All fixed.
+utils.js v3, cricket.js v20. Demolish/ATC/Bullseye share utils.js and pick this
+up too (Pokémon has its own copy — untouched).
+
 ## Demolish + ATC — launch-blocker hardening — 2026-07-02
 (No Cricket version change.) Ported three Cricket fixes that had never reached
 the copy-pasted siblings:

@@ -48,8 +48,25 @@ function showScreen(id) {
 }
 
 // ── SPEECH SYNTHESIS ─────────────────────────────────────────
+// Hardened against the two ways Chromium/Edge speech dies mid-session:
+//   1. An utterance stalls and never fires onend, so the queue locks up. Edge's
+//      "Natural"/"Neural" voices are cloud-streamed and do this when their
+//      service session expires — the classic "caller got slow, then went silent".
+//   2. cancel() followed by speak() in the same tick wedges the engine for good.
+// So: never speak in the same tick as a cancel, reconcile state on a background
+// timer rather than only when something wants to talk, and after repeated stalls
+// latch permanently onto a local (offline) voice for the rest of the session.
 let _callerVoice = null, _speechQueue = [], _isSpeaking = false, _speakStart = 0;
+let _speakDeadline = 0;        // when the in-flight utterance is presumed stalled
+let _currentUtt = null;        // identity guard — ignore events from old utterances
+let _speechBlockedUntil = 0;   // no speak() before this time (post-cancel settle)
+let _retryTimer = null, _speechWatchdog = null;
+let _speechStalls = 0;         // consecutive utterances that never completed
+let _forceLocalVoice = false;  // latched after SPEECH_MAX_STALLS — session-sticky
 const SPEECH_LS_KEY = 'dartbot_voice';
+const SPEECH_SETTLE_MS = 250;   // gap between cancel() and the next speak()
+const SPEECH_GRACE_MS = 1500;   // speaking/pending are unreliable this soon after speak()
+const SPEECH_MAX_STALLS = 2;    // stalls before dropping to a local voice
 
 // Preference order for auto-selection (first match wins):
 //   1. en-GB Natural/Neural (Edge high-quality voices)
@@ -75,10 +92,27 @@ function getEnglishVoices() {
     });
 }
 
+// Best local (offline) English voice — the fallback when cloud voices misbehave.
+// Windows always ships at least one (Hazel / George / Susan / Zira).
+function _pickLocalVoice() {
+  const local = window.speechSynthesis.getVoices()
+    .filter(v => v.localService && v.lang.startsWith('en'));
+  if (!local.length) return null;
+  return local.find(v => v.lang === 'en-GB') || local[0];
+}
+
 function initSpeech() {
   function pick() {
     const voices = window.speechSynthesis.getVoices();
     if (!voices.length) return false; // not ready yet
+
+    // Once we've fallen back to local, stay there — don't let a late
+    // onvoiceschanged put us back on the voice that just failed.
+    if (_forceLocalVoice) {
+      _callerVoice = _pickLocalVoice() || _callerVoice;
+      _populateVoicePicker();
+      return true;
+    }
 
     // Restore saved choice
     const saved = localStorage.getItem(SPEECH_LS_KEY);
@@ -109,6 +143,21 @@ function initSpeech() {
   if ('onvoiceschanged' in window.speechSynthesis) {
     window.speechSynthesis.onvoiceschanged = () => pick();
   }
+
+  _startSpeechWatchdog();
+}
+
+// Reconciles speech state in the background, so a stalled utterance is cleared
+// *between* calls instead of the next call paying for it. Without this, a dropped
+// onend means the following line waits for the stall timeout before it is heard.
+function _startSpeechWatchdog() {
+  if (_speechWatchdog || !window.speechSynthesis) return;
+  _speechWatchdog = setInterval(() => {
+    const synth = window.speechSynthesis;
+    if (!synth) return;
+    if (synth.paused) synth.resume();   // Chromium parks synthesis when backgrounded
+    if (_isSpeaking || _speechQueue.length) _doSpeak();
+  }, 1000);
 }
 
 function _populateVoicePicker() {
@@ -130,11 +179,16 @@ function setVoice(name) {
   }
 }
 
-// priority=true clears queue first (use for bust, checkout, announcements)
+// priority=true jumps the queue and interrupts whatever is speaking
 // non-priority capped at 2 pending — drops oldest if backed up so caller stays current
 function speak(text, priority = false) {
+  if (!text || !window.speechSynthesis) return;
   if (priority) {
     _speechQueue = [text];
+    // Actually interrupt. _doSpeak won't speak until the cancel has settled.
+    if (_isSpeaking || window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+      _hardCancel();
+    }
   } else {
     _speechQueue.push(text);
     if (_speechQueue.length > 2) _speechQueue.shift();
@@ -144,32 +198,102 @@ function speak(text, priority = false) {
 
 function cancelSpeech() {
   _speechQueue = [];
+  if (_retryTimer) { clearTimeout(_retryTimer); _retryTimer = null; }
+  _hardCancel();
+}
+
+// The only place that calls speechSynthesis.cancel(). Blocks speak() for a beat
+// afterwards — calling speak() in the same tick as cancel() is what wedges the
+// engine until the page is reloaded.
+function _hardCancel() {
   _isSpeaking = false;
-  if (window.speechSynthesis) window.speechSynthesis.cancel();
+  _currentUtt = null;
+  try { window.speechSynthesis.cancel(); } catch {}
+  _speechBlockedUntil = Date.now() + SPEECH_SETTLE_MS;
+}
+
+function _scheduleRetry(ms) {
+  if (_retryTimer) return;
+  _retryTimer = setTimeout(() => { _retryTimer = null; _doSpeak(); }, ms);
+}
+
+// An utterance that never completes counts as a stall. Two in a row and we give
+// up on the current voice for the rest of the session and go local — a cloud
+// voice whose session has expired never recovers on its own.
+function _noteStall() {
+  if (_forceLocalVoice) return;
+  if (++_speechStalls < SPEECH_MAX_STALLS) return;
+  const local = _pickLocalVoice();
+  if (!local) return;              // nothing better available — keep trying
+  _forceLocalVoice = true;
+  _callerVoice = local;
+  // Drop any saved pin too: there is no voice picker in the UI any more, so a
+  // stale pin would otherwise force the failing voice back on every reload.
+  try { localStorage.removeItem(SPEECH_LS_KEY); } catch {}
+}
+
+// Resolve the chosen voice against the *current* list. Voice objects go stale
+// when the browser re-registers voices; assigning a stale one makes Chromium
+// drop the utterance silently. Better to fall back to the default voice.
+function _liveVoice() {
+  if (!_callerVoice) return null;
+  return window.speechSynthesis.getVoices().find(v => v.name === _callerVoice.name) || null;
 }
 
 function _doSpeak() {
-  // Chrome silently pauses synthesis — wake it up
-  if (window.speechSynthesis.paused) window.speechSynthesis.resume();
+  const synth = window.speechSynthesis;
+  if (!synth) return;
+  if (synth.paused) synth.resume();
 
-  // Watchdog: if stuck speaking for >8s, onend likely never fired — force reset
-  if (_isSpeaking && Date.now() - _speakStart > 8000) {
-    _isSpeaking = false;
-    window.speechSynthesis.cancel();
+  if (_isSpeaking) {
+    const elapsed = Date.now() - _speakStart;
+    if (elapsed > _speakDeadline) {
+      // Presumed wedged: onend never came and it has run far longer than the
+      // text could possibly take.
+      _noteStall();
+      _hardCancel();
+    } else if (elapsed > SPEECH_GRACE_MS && !synth.speaking && !synth.pending) {
+      // Finished without firing onend. The grace window matters: these flags read
+      // false for a moment right after speak(), and trusting them too early
+      // stacks a second utterance onto the engine's queue behind the first.
+      _isSpeaking = false;
+      _currentUtt = null;
+    }
   }
 
-  // Safety: reset if synthesis finished without firing onend
-  if (_isSpeaking && !window.speechSynthesis.speaking && !window.speechSynthesis.pending) {
-    _isSpeaking = false;
-  }
   if (_isSpeaking || !_speechQueue.length) return;
+
+  const wait = _speechBlockedUntil - Date.now();
+  if (wait > 0) { _scheduleRetry(wait); return; }
+
+  const text = _speechQueue.shift();
   _isSpeaking = true;
   _speakStart = Date.now();
-  const utt = new SpeechSynthesisUtterance(_speechQueue.shift());
-  if (_callerVoice) utt.voice = _callerVoice;
+  // Generous ceiling on how long this text could take at rate 1.25 (~12 chars/sec).
+  _speakDeadline = Math.min(12000, 2500 + text.length * 150);
+
+  const utt = new SpeechSynthesisUtterance(text);
+  const voice = _liveVoice();
+  if (voice) utt.voice = voice;
   utt.rate = 1.25; utt.pitch = 1.0; utt.volume = 1.0;
-  utt.onend = utt.onerror = () => { _isSpeaking = false; _doSpeak(); };
-  window.speechSynthesis.speak(utt);
+  utt.onend = () => {
+    if (_currentUtt !== utt) return;   // stale event from an utterance we cancelled
+    _speechStalls = 0;
+    _isSpeaking = false;
+    _currentUtt = null;
+    _doSpeak();
+  };
+  utt.onerror = e => {
+    if (_currentUtt !== utt) return;
+    const err = (e && e.error) || '';
+    if (err !== 'interrupted' && err !== 'canceled') _noteStall();
+    _isSpeaking = false;
+    _currentUtt = null;
+    _speechBlockedUntil = Date.now() + SPEECH_SETTLE_MS;
+    _doSpeak();
+  };
+  _currentUtt = utt;
+  synth.speak(utt);
 }
 
 // ── WEB AUDIO PRIMITIVES ─────────────────────────────────────
