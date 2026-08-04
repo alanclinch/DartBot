@@ -5,6 +5,16 @@ COPY RESULTS. Bump `DARTBOT_VERSION` in `assets/js/cricket.js` and the
 `#version-badge` text in `games/cricket.html` together, and add an entry here.
 (Placeholder 3-digit scheme `vNNN` for now — will revisit later.)
 
+## Per-game bot split + handover docs — 2026-08-05
+(No Cricket version change — Cricket's bot logic is byte-identical.) The shared `bots.js` was
+**split per game** so nothing outside Cricket can ever touch its calibration:
+- `bots.js` → **`cricket-bots.js`** (Cricket's exclusive, calibrated original), forked verbatim into
+  new `demolish-bots.js` and `aroundtheclock-bots.js` (Pokémon + Baseball were already isolated).
+  Each game loads only its own bot file; identical global names never collide.
+- Demolish calibration tools (`tools/`) now read `demolish-bots.js`, not Cricket's file.
+- Docs: new `handover/baseball.md` (spec for a new Baseball game) + `handover/design-enhanced.md`,
+  refreshed `handover/cricket.md`, and CLAUDE.md/GEMINI.md updated for the split, `design/`, `tools/`.
+
 ## v007 — 2026-08-01
 FIX: the caller degraded during a session — intermittent delays that got worse
 as the game went on, then silence. No speech code had changed since May, so the

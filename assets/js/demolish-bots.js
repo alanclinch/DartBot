@@ -1,12 +1,22 @@
 // ═══════════════════════════════════════════════════════════
-//  bots.js — CPU opponents, face SVGs, and bot AI
-//  Shared across all DartBot games that support CPU players.
+//  demolish-bots.js — CPU opponents, faces, and bot AI
+//  DEMOLISH'S PRIVATE, ISOLATED COPY (forked from Cricket's bot system).
+//
+//  Isolated so Demolish dev AND its calibration tools (tools/) can never
+//  affect Cricket's calibrated bots, and vice-versa. Demolish's page loads
+//  ONLY this file, so the identical global names below do not collide.
+//
+//  Demolish is a non-Cricket game: difficulty comes from BOT_TIERS[cpuId].sigma
+//  via generateCpuThrow(target, mpr, {sigmaOverride, sigmaROverride, aimROverride}),
+//  NOT from mpr. Retune the BOT_TIERS sigmas below (and calibrate via
+//  tools/calibrate-demolish-bot) freely — changes here affect Demolish ONLY.
+//  Leave the physics math (generateCpuThrow) alone unless the owner directs it.
 //
 //  Exports (globals):
-//    CPU_PLAYERS          — array of 10 named opponents
+//    CPU_PLAYERS          — array of 9 named opponents
 //    makeFaceSVG(face, size)
 //    humanAvatarSVG(color, size)
-//    generateCpuThrow(target, mpr)
+//    generateCpuThrow(target, mpr, opts)
 //    getAdjacentNumbers(num)
 // ═══════════════════════════════════════════════════════════
 

@@ -18,11 +18,11 @@
 const fs = require('fs');
 const path = require('path');
 
-// Load production bots.js verbatim — same scatter, same overrides.
+// Load demolish-bots.js verbatim — same scatter, same overrides.
 // Append a globalThis expose because `const` declarations inside eval()
 // don't leak to the surrounding scope; we need CPU_PLAYERS_REF and the throw
 // function visible to the rest of this script.
-const botsSrc = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'bots.js'), 'utf8');
+const botsSrc = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'demolish-bots.js'), 'utf8');
 eval(botsSrc + '\n;globalThis.__demolishBots = { players: CPU_PLAYERS, gen: generateCpuThrow };');
 const CPU_PLAYERS_REF = globalThis.__demolishBots.players;
 const throwDartRaw    = globalThis.__demolishBots.gen;

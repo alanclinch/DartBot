@@ -12,10 +12,10 @@
 const fs = require('fs');
 const path = require('path');
 
-// Load bots.js as a string and eval it into this module's globals so we
-// can call generateCpuThrow exactly as the browser does (no rewriting,
-// no chance of drift from the production scatter model).
-const botsSrc = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'bots.js'), 'utf8');
+// Load demolish-bots.js as a string and eval it into this module's globals so
+// we can call generateCpuThrow exactly as the browser does (no rewriting,
+// no chance of drift from Demolish's scatter model).
+const botsSrc = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'demolish-bots.js'), 'utf8');
 // makeFaceSVG / humanAvatarSVG aren't needed and reference no DOM, just
 // build SVG strings. Safe to eval.
 eval(botsSrc); // exposes CPU_PLAYERS, BOARD_ORDER, generateCpuThrow, etc.

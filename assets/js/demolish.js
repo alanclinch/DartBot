@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════
 //  demolish.js — Demolish game logic
-//  Relies on globals from utils.js, bots.js, autodarts.js.
+//  Relies on globals from utils.js, demolish-bots.js, autodarts.js.
 // ═══════════════════════════════════════════════════════════
 
 // ══ CONSTANTS ══

@@ -1,4 +1,4 @@
-// CPU_PLAYERS, makeFaceSVG, humanAvatarSVG — from bots.js
+// CPU_PLAYERS, makeFaceSVG, humanAvatarSVG — from cricket-bots.js
 // PLAYER_COLORS, isMiss, segScore, dartSpeak, showScreen,
 // initSpeech, speak, gAC, tone, noiz, sfx*, spawnConfetti — from utils.js
 
@@ -1728,7 +1728,7 @@ function runCpuTurn(){
   });
 }
 
-// generateCpuThrow, getAdjacentNumbers — from bots.js
+// generateCpuThrow, getAdjacentNumbers — from cricket-bots.js
 
 // ── Arcade CPU model ─────────────────────────────────────────
 // Pure probability model — completely separate from the physics model.

@@ -1,6 +1,6 @@
 // =============================================
 // Around the Clock — Classic & Score Attack
-// CPU_PLAYERS, makeFaceSVG, generateCpuThrow — bots.js
+// CPU_PLAYERS, makeFaceSVG, generateCpuThrow — aroundtheclock-bots.js
 // PLAYER_COLORS, isMiss, dartSpeak, showScreen, initSpeech, speak,
 // cancelSpeech, sfx*, spawnConfetti — utils.js
 // =============================================

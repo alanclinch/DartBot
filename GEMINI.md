@@ -49,12 +49,21 @@ files, commit, push.
 - `index.html` — the game menu (links the 6 live games).
 - `games/<name>.html` — one HTML page per game.
 - `assets/js/<name>.js`, `assets/css/<name>.css` — per-game logic/styles.
-- `assets/js/` shared modules: `utils.js`, `autodarts.js`, `bots.js`. `assets/css/game.css` shared UI.
+- `assets/js/` shared modules: `utils.js`, `autodarts.js`. `assets/css/game.css` shared UI.
+  **Bots are NOT shared** — each game loads its own `<game>-bots.js` fork (see The bot system).
 - `CHANGELOG.md` — release notes (see Versioning).
+- `design/` — Claude Design source for Cricket's **Enhanced (broadcast) mode**: self-contained
+  1920×1080 preview files (`enhanced-board.html`, `enhanced-winner.html`) built by `build-previews.js`,
+  which inlines the live `game.css` + `cricket.css`. See `design/README.md`. **Re-run
+  `node design/build-previews.js` after any Cricket CSS change** or the previews drift.
+- `tools/` — Demolish bot calibration harness (`calibrate-demolish-bot.html`/`.js`) + a headless
+  Demolish game simulator (`simulate-demolish-games.js`).
 - `Documentation/` — the original dev guide (docx/pdf) + a CPU architecture PDF. Reference material.
+  **Gitignored / local-only** (as is `assets/audio/`, kept out for copyright) — don't expect either in
+  the repo.
 - `deprecated/`, `games/x01.html` — **orphaned/old, NOT linked from index.html. Ignore them.**
-- `handover/` — per-game deep handover docs (Cricket first). **Start here for "what to work on next"
-  per game** — they carry the current state + priorities that this file only summarises.
+- `handover/` — per-game deep handover docs (Cricket, Demolish, design-enhanced). **Start here for
+  "what to work on next"** — they carry the current state + priorities that this file only summarises.
 - `.claude/projects/.../memory/` — the persistent memory (see "Memory" below). **Read it.**
 
 ## The games
@@ -67,6 +76,14 @@ Six live games (linked from `index.html`). **Pattern:** each is `games/X.html` +
   Arcade. 2–4 players. Has an **Enhanced Graphics** 2-player broadcast-TV theme, a **test bench**
   (see Testing), and a per-leg **play-style effect** (see Bots). Biggest file (~2.4k lines): carries
   the cloud module + test suite.
+  - **Enhanced-mode redesign** is done in **Claude Design** (round-tripped via DesignSync /
+    `/design-sync`) off the `design/` previews, folding back into `cricket.css`'s
+    `#game.enhanced-graphics` / `body.enhanced-winner` sections + `drawEnhancedMarkSVG`. **Don't lose
+    these constraints:** everything stays scoped under those selectors (toggling Enhanced off must
+    reproduce stock Cricket exactly), it's **2-player only**, and it targets the 1080p-TV-across-the-
+    room-with-glare environment (solid bright fills + dark text, large type, air-mouse-friendly).
+    DesignSync needs an interactive `/design-login` — not available in all environments, so that leg
+    is handed to Claude Code desktop. Full handover: `handover/design-enhanced.md`.
 - **Demolish** (`demolish.js`) — X01-style (score to zero / checkout, PPR) with a gem-tower visual.
 - **Around the Clock** (`aroundtheclock.js`) — **Classic** (hit 1→20→Bull in order) + **Score Attack**
   (21 scoring rounds; ties → sudden-death bull).
@@ -83,29 +100,38 @@ evolve without touching the others. Don't wire Pokémon into shared changes.
 - **`autodarts.js`** — the WS connection. `initAutodarts(handleWS)`, `updateWSUI(on)`,
   `autodartsReset()` / `autodartsCalibrate()` (POST to `/api/reset`, `/api/config/calibration/auto`).
   The `.ws-dot` pulses on each inbound message (liveness). Each game defines its own `handleWS(data)`.
-- **`bots.js`** — CPU roster + throw physics. **Sacred — see below.**
+- **Per-game bot files** — `cricket-bots.js`, `demolish-bots.js`, `aroundtheclock-bots.js`,
+  `baseball-bots.js`, `pokemon-bots.js`: each game's own copy of the CPU roster + throw physics.
+  **Not shared** (was one `bots.js`; split per game so nothing outside Cricket can touch Cricket's
+  calibration). Cricket's `cricket-bots.js` is **sacred — see below.**
 - **`game.css`** — all shared setup/modal/winner/broadcast styling + `:root` colour vars. Per-game
   CSS is game-screen-only.
 
-## The bot system (`bots.js`) — SACRED, tread very carefully
+## The bot system (per-game `<game>-bots.js`) — SACRED, tread very carefully
 > ⚠️ **The Cricket CPU bots are the crown jewel of this project.** They are the product of
 > **100+ hours of calibration** and the owner considers them among the best Cricket bots anywhere —
 > they are the single most carefully-tuned part of the codebase. **Default to findings, not edits:**
-> surface anything that looks off and let the user decide; do **not** change bot math or ratings
-> unless the user *explicitly* directs it. When you do, keep the change minimal and
+> surface anything that looks off and let the user decide; do **not** change Cricket's bot math or
+> ratings unless the user *explicitly* directs it. When you do, keep the change minimal and
 > **re-validate with the test bench every time** — a change that looks harmless can quietly shift the
 > calibrated MPRs. **Read the `bot_bible` memory before touching anything bot-related.**
 
 Summary:
-- **`CPU_PLAYERS`** — 9 named darts pros (ids `cpu0`–`cpu8`), field `mpr`. Current ladder is a
+- **Split per game (each game owns its bot file).** `cricket-bots.js` is Cricket's calibrated original;
+  `demolish-bots.js`, `aroundtheclock-bots.js`, `baseball-bots.js`, `pokemon-bots.js` are verbatim
+  forks. Each game loads **only its own** (identical global names never collide), so nothing outside
+  Cricket can touch Cricket's bots. **Trade-off:** a real physics improvement/bugfix must be
+  hand-ported to each fork. Non-Cricket forks may retune **their own** `BOT_TIERS` freely.
+- **`CPU_PLAYERS`** — 9 named darts pros (ids `cpu0`–`cpu8`), field `mpr`. Cricket's ladder is a
   compressed low end: `0.5, 0.9, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4`.
 - **Two difficulty dials:** `mpr` drives **Cricket** (an MPR→sigma physics formula + a "mark control"
-  layer). Non-Cricket games (Demolish, ATC) drive difficulty from **`BOT_TIERS[cpuId].sigma`** via
-  `generateCpuThrow(..., { sigmaOverride })` — they do **not** use `mpr` for difficulty.
-- **`generateCpuThrow`** is a real 2D-dartboard Gaussian scatter sim. Off-limits: the formula, the
-  `cricketAim` block, mark control, the roster values — **change only when the user explicitly
-  directs it, and re-validate with the test bench.** Non-Cricket tuning goes through additive `opts`
-  hooks (`sigmaOverride`, `sigmaROverride`, `aimROverride`), never by editing Cricket's path.
+  layer). Non-Cricket games (Demolish, ATC, Baseball) drive difficulty from **`BOT_TIERS[cpuId].sigma`**
+  via `generateCpuThrow(..., { sigmaOverride })` — they do **not** use `mpr` for difficulty.
+- **`generateCpuThrow`** is a real 2D-dartboard Gaussian scatter sim. In **`cricket-bots.js`** the
+  formula, the `cricketAim` block, mark control, and the roster values are off-limits — **change only
+  when the user explicitly directs it, and re-validate with the test bench.** Other games tune their
+  own fork's `BOT_TIERS` (and the additive `opts` hooks `sigmaOverride`/`sigmaROverride`/`aimROverride`)
+  — they physically **cannot** touch Cricket's file.
 - Cricket also has a per-leg **play-style effect** (Closer / Score-to-50/100 / Stay-ahead / Hammer):
   additive, MPR-neutral by construction (only changes *which* number to aim at, not accuracy),
   default-on. Lives in `cricket.js` (`CRICKET_STYLES`, `getBestTarget`).
@@ -146,6 +172,8 @@ entry, and bump the `?v=` cache-busters — all together. Currently Cricket-scop
 - **COPY RESULTS** emits a markdown table (version + per-bot Actual/Δ + per-style breakdown). Ask the
   user to paste it back rather than screenshot. Δ verdicts: ✓ <0.1, ~ <0.25, ✗ beyond.
 - Any bot-behaviour change must be re-validated here.
+- **Demolish** has its own calibration tooling under `tools/` (`calibrate-demolish-bot.html` + the
+  headless `simulate-demolish-games.js`) — separate from Cricket's bench.
 - **No board? Test manually.** Open the game HTML in a browser (WS just won't connect — it falls
   back to Manual Mode). Enter darts via the on-screen **keypad**, or add a CPU opponent and watch it
   play. Cricket also has **keyboard test keys** (e.g. `q`=T20, `w`=S20, `0`=miss, space=next) for
