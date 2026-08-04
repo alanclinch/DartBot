@@ -62,8 +62,9 @@ files, commit, push.
   **Gitignored / local-only** (as is `assets/audio/`, kept out for copyright) — don't expect either in
   the repo.
 - `deprecated/`, `games/x01.html` — **orphaned/old, NOT linked from index.html. Ignore them.**
-- `handover/` — per-game deep handover docs (Cricket, Demolish, design-enhanced). **Start here for
-  "what to work on next"** — they carry the current state + priorities that this file only summarises.
+- `handover/` — per-game deep handover docs (Cricket, Demolish, design-enhanced, and **baseball** — a
+  planned new game with a full build spec). **Start here for "what to work on next"** — they carry the
+  current state + priorities that this file only summarises.
 - `.claude/projects/.../memory/` — the persistent memory (see "Memory" below). **Read it.**
 
 ## The games

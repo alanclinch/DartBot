@@ -63,7 +63,8 @@ Create three new files, mirroring every other game:
 **Shared modules (reuse, don't fork):** `utils.js` (colours, `isMiss`, `segScore`, `dartSpeak`,
 `showScreen`, TTS `speak`, Web-Audio `sfx*`, `spawnConfetti`), `autodarts.js` (the WS connection).
 Reference them at their **current** cache-bust versions (check another game's HTML for the live
-numbers — e.g. `autodarts.js?v=3`, `utils.js?v=2`, `game.css?v=2`) and start your own files at `?v=1`.
+numbers — at time of writing `autodarts.js?v=3`, `utils.js?v=3`, `game.css?v=2`) and start your own
+files at `?v=1`.
 
 **BOTS — Baseball uses its OWN isolated copy, `baseball-bots.js` (already created).** Bots are **split
 per game** (project-wide): each game loads its own `<game>-bots.js` fork and there is **no shared
