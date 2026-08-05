@@ -433,53 +433,17 @@
 }
 
 /* ── SETUP: HOW IT PLAYS ─────────────────────────────────── */
-/* One column, not two — a 2-up grid made the reading order ambiguous and left
-   wrapped lines stranded. Format, then the scoring table, then how you win. */
-.bb-rules { display: flex; flex-direction: column; gap: 14px; }
+/* Plain prose. A previous version used tag pills and a 5-cell scoring table;
+   it looked tidier but read slower — a chart you have to decode is worse than
+   three sentences you just read. */
+.bb-rules {
+  font-size: 19px;
+  line-height: 1.65;
+  color: #fff;
+  max-width: 68ch;
+}
+.bb-rules b { color: var(--bb-amber); font-weight: 800; }
 
-.bb-rule-line {
-  display: flex; align-items: baseline; gap: 14px;
-  font-size: 16px; line-height: 1.5; color: #fff;
-}
-.bb-rule-line b { color: var(--bb-amber); font-weight: 800; }
-.bb-rule-tag {
-  flex: none; width: 84px;
-  padding: 5px 0 4px;
-  text-align: center;
-  background: var(--bb-amber); color: var(--bb-ink);
-  font: 900 11px 'Exo 2', sans-serif; letter-spacing: 2px;
-  border-radius: 5px;
-}
-
-/* Echoes the in-game line score: dim label over a solid value cell. */
-.bb-runs-table {
-  display: grid; grid-template-columns: repeat(5, 1fr);
-  gap: 8px;
-}
-.bb-run-col {
-  display: flex; flex-direction: column; align-items: center; gap: 6px;
-  background: var(--bb-panel-2);
-  border: 1px solid var(--bb-line);
-  border-radius: 8px;
-  padding: 10px 4px 12px;
-}
-.bb-run-col span {
-  font: 800 11px 'Exo 2', sans-serif; letter-spacing: 1.5px;
-  color: var(--bb-dim); text-align: center;
-}
-.bb-run-col strong {
-  display: flex; align-items: center; justify-content: center;
-  width: 100%; max-width: 74px; padding: 4px 0 3px;
-  background: #fff; color: var(--bb-ink);
-  border-radius: 6px;
-  font: 900 28px 'Exo 2', sans-serif; line-height: 1;
-}
-.bb-run-col.bull strong { background: var(--bb-amber); }
-.bb-rule-note {
-  font-size: 14px; line-height: 1.5;
-  color: var(--muted); opacity: .8;
-  margin-top: -4px;
-}
 #roster-hint {
   margin-top: 12px; font-size: 14px; color: var(--muted); opacity: .8;
 }
