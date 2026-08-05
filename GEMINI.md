@@ -46,7 +46,7 @@ files, commit, push.
      WS activity pulse) over `console.log`, and keep board-side controls air-mouse-friendly.
 
 ## Repo layout
-- `index.html` — the game menu (links the 6 live games).
+- `index.html` — the game menu (links the 7 live games).
 - `games/<name>.html` — one HTML page per game.
 - `assets/js/<name>.js`, `assets/css/<name>.css` — per-game logic/styles.
 - `assets/js/` shared modules: `utils.js`, `autodarts.js`. `assets/css/game.css` shared UI.
@@ -68,7 +68,7 @@ files, commit, push.
 - `.claude/projects/.../memory/` — the persistent memory (see "Memory" below). **Read it.**
 
 ## The games
-Six live games (linked from `index.html`). **Pattern:** each is `games/X.html` + `assets/js/X.js` +
+Seven live games (linked from `index.html`). **Pattern:** each is `games/X.html` + `assets/js/X.js` +
 `assets/css/X.css`, sharing `game.css` + the shared JS modules.
 
 **In active development:**
@@ -88,6 +88,15 @@ Six live games (linked from `index.html`). **Pattern:** each is `games/X.html` +
 - **Demolish** (`demolish.js`) — X01-style (score to zero / checkout, PPR) with a gem-tower visual.
 - **Around the Clock** (`aroundtheclock.js`) — **Classic** (hit 1→20→Bull in order) + **Score Attack**
   (21 scoring rounds; ties → sudden-death bull).
+- **Baseball** (`baseball.js`) — 10 innings (1–9 target that number, inning 10 the Bull); 3 darts each
+  per inning, S/D/T on target = 1/2/3 runs, bull inning outer/inner = 1/2. Most runs wins; level after
+  inning 10 → extra Bull innings (sudden death). **2-player only and themed-only** — the MLB-style
+  broadcast HUD *is* the game, so unlike Cricket there is **no enhanced/stock toggle** and no
+  "toggling off must reproduce stock" constraint. Centrepiece is the **line score** (innings across
+  the top, runs per inning, bold R total). Stat is **runs + RPI — never MPR**. Flourishes for a 9-run
+  inning (GRAND SLAM) and a 6-run bull inning (PERFECT INNING). ⚠️ Do **not** add a `display` rule to
+  `#game` in `baseball.css` — an id-level `display` beats `.screen{display:none}` and hides the
+  winner screen (Cricket's nastiest enhanced-mode bug).
 
 **Not in active development** (leave unless asked): Snakes & Ladders, Pokémon, Bullseye.
 Pokémon is deliberately **isolated** — its own `pokemon-*.js` / `pokemon-game.css` copies — so it can
@@ -187,7 +196,11 @@ entry, and bump the `?v=` cache-busters — all together. Currently Cricket-scop
   highest-leverage improvement is extracting these into `utils.js`.**
 - **ATC:** displays `mpr` on cards/tiles but plays on `BOT_TIERS` sigma → labels mislead after the
   roster remap. Also writes its "hits"/darts into the *same* Neon `players.marks`/`darts` columns
-  Cricket uses → cross-game stat contamination (Demolish avoids this via `x01_*` columns).
+  Cricket uses → cross-game stat contamination (Demolish avoids this via `x01_*` columns; Baseball
+  avoids it by showing RPI, not MPR, and staying localStorage-only under `dartbot_baseball_players`).
+- **Baseball sudden death can run long** with weak bots — both sides can miss the bull for many extra
+  innings (a simulated cpu0-vs-cpu0 tie once reached inning 26). Real play with humans is far shorter;
+  flagged rather than capped, since capping would need a rule decision.
 - **Pokémon** still has an on-load `prompt()` Neon bug (not active dev — same fix ATC just got).
 - `CLAUDE.md` and `GEMINI.md` are kept in sync (Claude/Gemini handovers) — **update both together.**
 

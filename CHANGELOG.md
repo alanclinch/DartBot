@@ -5,6 +5,53 @@ COPY RESULTS. Bump `DARTBOT_VERSION` in `assets/js/cricket.js` and the
 `#version-badge` text in `games/cricket.html` together, and add an entry here.
 (Placeholder 3-digit scheme `vNNN` for now — will revisit later.)
 
+## New game: Baseball — 2026-08-05
+(No Cricket version change — no Cricket file was touched.) Built to the spec in
+`handover/baseball.md`. New `games/baseball.html`, `assets/js/baseball.js`,
+`assets/css/baseball.css`, wired into `index.html` (7 live games now).
+- **Rules:** 10 innings — 1–9 target that number, inning 10 is the Bull. 3 darts each per
+  inning; single/double/treble on target = 1/2/3 runs (max 9), bull inning outer/inner = 1/2
+  (max 6). Most runs wins; level after inning 10 → extra Bull innings, sudden death.
+- **2-player only, themed-only** (owner-confirmed): the broadcast HUD *is* the game, so there
+  is no enhanced/stock toggle and none of Cricket's "toggling off must reproduce stock"
+  scoping constraint. Deliberately no `display` override on `#game` — that is what hid
+  Cricket's winner screen behind the enhanced board.
+- **The line score is the centrepiece:** a row per player, innings 1–9 + B across the top,
+  runs per inning in the cells, bold R total at the end, live inning column highlighted, and
+  a max inning (9, or 6 in the bull) flagged amber. Repeated on the winner screen as the
+  final box score.
+- **Flourishes** (owner-confirmed, visual + audio, no bonus runs): GRAND SLAM on a 9-run
+  inning, PERFECT INNING on a 6-run bull inning.
+- **Stats: runs + RPI** (runs per inning). MPR is never shown — it is Cricket's metric and
+  would mislead here (the bug ATC has). localStorage only, under `dartbot_baseball_players`;
+  no cloud, so no chance of the cross-game column contamination ATC suffers.
+- **Bots:** uses its own isolated `baseball-bots.js`; difficulty from `BOT_TIERS` sigma via
+  `sigmaOverride`, never `mpr`. Cricket's `cricket-bots.js` is untouched.
+- Validated headlessly: 700 simulated games (scoring rules, run/inning/dart invariants, tie →
+  extra innings, undo, monotonic difficulty ladder ≈5 → 38 runs across the 9 tiers), plus a second
+  harness covering the `handleWS` board path.
+- **Hardened after an external code review** (OpenAI Codex, run adversarially against the build):
+  - **Takeout now pads the visit with misses before advancing.** Every other game advances straight
+    away on `Takeout finished`, silently losing the unthrown darts — and in inning 10 that could
+    decide a match off a one-dart visit. Baseball fills the visit to 3 darts first, so the
+    3-darts-per-inning invariant and the dart count both stay honest while takeout still works as
+    the recovery hatch for a dart the board never saw. **This is a deliberate divergence from
+    Cricket/ATC/Demolish, which still have the original behaviour.**
+  - **Fixed a crash race:** the delayed hop to the winner screen was an untracked `setTimeout`, so
+    pressing End Game inside that 1.3s window fired `goToWinner()` after `endGame()` had reset
+    `winnerIdx` to `-1` → `players[-1].name`. Now a tracked `winnerTimer`, cleared on every exit
+    path, plus a guard in `goToWinner()`. (Self-inflicted: ATC does not reset `winnerIdx`.)
+  - **Win music now honours the SFX toggle**, matching `cricket.js` (the reference implementation).
+    ATC and Demolish still play it ungated.
+  - **Shared cache-busters corrected** to `game.css?v=3` / `utils.js?v=4`.
+  - **Timer/overlay cleanup centralised** so no flourish or announcement can fire into a screen
+    that has already moved on.
+  - **Manual/padded misses now render as MISS**, not a neutral `M` — `utils.js` `isMiss()` matches
+    `M1`/`M2` but not the bare `{name:'M'}` this repo constructs, so Baseball also treats a dart
+    with no number as a miss.
+  - Long sudden-death games shrink the box score in two steps rather than scrolling it; verified
+    legible at inning 26 on 1080p.
+
 ## Per-game bot split + handover docs — 2026-08-05
 (No Cricket version change — Cricket's bot logic is byte-identical.) The shared `bots.js` was
 **split per game** so nothing outside Cricket can ever touch its calibration:

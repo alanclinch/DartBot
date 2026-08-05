@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Baseball — Autodarts</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚾</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/game.css?v=3">
+<script src="../assets/js/autodarts.js?v=3"></script>
+<script src="../assets/js/utils.js?v=4"></script>
+<script src="../assets/js/baseball-bots.js?v=1"></script>
+<link rel="stylesheet" href="../assets/css/baseball.css?v=1">
+</head>
+<body>
+
+<!-- SETUP -->
+<div id="setup" class="screen active">
+  <div class="setup-title">BASEBALL <span>⚾</span></div>
+
+  <div class="setup-card">
+    <h3>How It Plays</h3>
+    <div class="bb-rules">
+      <div><b>10 innings</b><span>Innings 1–9 target that number. Inning 10 is the Bull.</span></div>
+      <div><b>3 darts</b><span>Each player throws three darts per inning at that target.</span></div>
+      <div><b>Runs</b><span>Single = 1, double = 2, treble = 3. Max 9 in an inning.</span></div>
+      <div><b>Bull inning</b><span>Outer bull = 1 run, inner bull = 2. Max 6.</span></div>
+      <div><b>Winner</b><span>Most runs after 10 innings takes the ball game.</span></div>
+      <div><b>Level?</b><span>Extra Bull innings — sudden death until someone leads.</span></div>
+    </div>
+  </div>
+
+  <div class="setup-card">
+    <h3>Players <span style="color:var(--muted);font-size:12px;">(2 only)</span></h3>
+    <div id="player-list"></div>
+    <div class="add-btns">
+      <button class="add-btn" id="add-human-btn" onclick="openHumanModal()">+ Human Player</button>
+      <button class="add-btn" id="add-cpu-btn" onclick="openCpuModal()">+ Computer Player</button>
+    </div>
+    <div id="roster-hint">Add 2 more players — Baseball is 2-player only.</div>
+    <div id="recent-players" class="recent-players"></div>
+  </div>
+
+  <button class="start-btn" id="start-btn" onclick="startGame()" disabled>PLAY BALL</button>
+
+  <div class="setup-card">
+    <h3>Settings</h3>
+    <div class="settings-grid">
+      <label class="setting-row">
+        <input type="checkbox" id="voice-toggle" onchange="setVoiceEnabled(this.checked)" checked>
+        <span>Voice Caller</span>
+      </label>
+      <label class="setting-row">
+        <input type="checkbox" id="sfx-toggle" onchange="setSfxEnabled(this.checked)" checked>
+        <span>Sound Effects</span>
+      </label>
+      <label class="setting-row">
+        <input type="checkbox" id="test-mode-toggle" onchange="setTestMode(this.checked)">
+        <span>Test Mode</span>
+      </label>
+    </div>
+    <div class="setting-actions">
+      <button class="setting-action-btn" onclick="window.location.href='../index.html'">Main Menu</button>
+      <button class="setting-action-btn" onclick="showStatsModal()">View Stats</button>
+    </div>
+  </div>
+</div>
+
+<!-- CPU MODAL -->
+<div id="cpu-modal" class="modal-overlay">
+  <div class="cpu-modal-box">
+    <h2>SELECT OPPONENT</h2>
+    <div class="cpu-grid" id="cpu-grid"></div>
+    <button class="cpu-modal-cancel" onclick="closeCpuModal()">Cancel</button>
+  </div>
+</div>
+
+<!-- HUMAN MODAL -->
+<div id="human-modal" class="modal-overlay">
+  <div class="cpu-modal-box" style="width:min(420px,96vw);">
+    <h2>ADD HUMAN PLAYER</h2>
+    <input type="text" id="new-human-name" class="modal-input" placeholder="Enter Name" maxlength="14">
+    <select id="new-human-flag" class="modal-input" style="cursor:pointer;">
+      <option value="sco" selected>Scotland</option>
+      <option value="eng">England</option>
+      <option value="wal">Wales</option>
+      <option value="ned">Netherlands</option>
+    </select>
+    <div style="display:flex;gap:14px;margin-top:10px;">
+      <button class="win-btn win-btn-primary" onclick="confirmAddHuman()">ADD PLAYER</button>
+      <button class="win-btn" onclick="closeHumanModal()">CANCEL</button>
+    </div>
+  </div>
+</div>
+
+<!-- GAME -->
+<div id="game" class="screen">
+  <div id="bb-board">
+
+    <div class="bb-topbar">
+      <div class="bb-brand">
+        <span>DART</span><span>BOT</span>
+        <small>LOCAL DARTS. LIVE SCORING.</small>
+      </div>
+      <div class="bb-match-strip">
+        <div class="bb-match-cell">INNING<br><strong id="bb-inning-top">1</strong></div>
+        <div class="bb-match-title">BASEBALL</div>
+        <div class="bb-match-cell">FORMAT<br><strong id="bb-inning-of">OF 10</strong></div>
+      </div>
+      <div class="bb-topbar-right">
+        <div id="bb-leg-badge" class="bb-leg-badge" style="display:none;"></div>
+      </div>
+    </div>
+
+    <div class="bb-main">
+      <div class="bb-team-slot" id="bb-team-slot-0"></div>
+
+      <div id="bb-hero">
+        <div class="bb-hero-kicker" id="bb-hero-kicker">INNING 1</div>
+        <div class="bb-hero-target" id="bb-hero-target">1</div>
+        <div class="bb-hero-sub" id="bb-hero-sub">HIT THE ONES</div>
+        <div class="bb-hero-darts">
+          <div class="bb-hd" id="bb-hd0"><div class="bb-hd-val">—</div><div class="bb-hd-runs"></div></div>
+          <div class="bb-hd" id="bb-hd1"><div class="bb-hd-val">—</div><div class="bb-hd-runs"></div></div>
+          <div class="bb-hd" id="bb-hd2"><div class="bb-hd-val">—</div><div class="bb-hd-runs"></div></div>
+        </div>
+      </div>
+
+      <div class="bb-team-slot" id="bb-team-slot-1"></div>
+    </div>
+
+    <div id="bb-linescore"></div>
+  </div>
+
+  <div id="side-panel">
+    <div>
+      <div class="panel-label">Current Turn</div>
+      <div class="turn-info">
+        <div class="turn-player" id="turn-player-name">—</div>
+        <div class="turn-sub" id="turn-sub">Throw your darts</div>
+      </div>
+    </div>
+
+    <div class="bb-side-row">
+      <div class="target-box">
+        <div class="target-label">TARGET</div>
+        <div class="target-val" id="target-val">1</div>
+      </div>
+      <div class="round-box">
+        <div class="round-num" id="inning-num">1</div>
+        <div class="round-sub" id="inning-sub">INNING</div>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel-label">Manual Input</div>
+      <div class="keypad-wrap">
+        <div class="keypad-row">
+          <button class="kp-btn" onclick="manualDart(1)">1</button>
+          <button class="kp-btn" onclick="manualDart(2)">2</button>
+          <button class="kp-btn" onclick="manualDart(3)">3</button>
+          <button class="kp-btn" onclick="manualDart(4)">4</button>
+          <button class="kp-btn" onclick="manualDart(5)">5</button>
+        </div>
+        <div class="keypad-row">
+          <button class="kp-btn" onclick="manualDart(6)">6</button>
+          <button class="kp-btn" onclick="manualDart(7)">7</button>
+          <button class="kp-btn" onclick="manualDart(8)">8</button>
+          <button class="kp-btn" onclick="manualDart(9)">9</button>
+          <button class="kp-btn" onclick="manualDart(10)">10</button>
+        </div>
+        <div class="keypad-row">
+          <button class="kp-btn" onclick="manualDart(11)">11</button>
+          <button class="kp-btn" onclick="manualDart(12)">12</button>
+          <button class="kp-btn" onclick="manualDart(13)">13</button>
+          <button class="kp-btn" onclick="manualDart(14)">14</button>
+          <button class="kp-btn" onclick="manualDart(15)">15</button>
+        </div>
+        <div class="keypad-row">
+          <button class="kp-btn" onclick="manualDart(16)">16</button>
+          <button class="kp-btn" onclick="manualDart(17)">17</button>
+          <button class="kp-btn" onclick="manualDart(18)">18</button>
+          <button class="kp-btn" onclick="manualDart(19)">19</button>
+          <button class="kp-btn" onclick="manualDart(20)">20</button>
+        </div>
+        <div class="keypad-row">
+          <button class="kp-btn" onclick="manualDart(25)" style="flex:2;">BULL</button>
+          <button class="kp-btn kp-miss" onclick="manualDart(0)">MISS</button>
+          <button class="kp-btn kp-undo" onclick="undoLastDart()">UNDO</button>
+        </div>
+        <div class="keypad-row">
+          <button class="kp-btn kp-mod" id="mod-double" onclick="toggleKeypadMod(2)">DOUBLE</button>
+          <button class="kp-btn kp-mod" id="mod-treble" onclick="toggleKeypadMod(3)">TREBLE</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="game-ws">
+      <div class="ws-dot" id="game-ws-dot"></div>
+      <div class="ws-label" id="game-ws-label">Not Connected</div>
+    </div>
+    <div style="display:flex;gap:6px;">
+      <button class="end-btn" style="flex:1;font-size:11px;" onclick="autodartsReset();this.style.borderColor='var(--bb-green)';this.style.color='var(--bb-green)';setTimeout(()=>{this.style.borderColor='';this.style.color=''},700)">RESET</button>
+      <button class="end-btn" style="flex:1;font-size:11px;" onclick="autodartsCalibrate();this.style.borderColor='var(--bb-blue)';this.style.color='var(--bb-blue)';setTimeout(()=>{this.style.borderColor='';this.style.color=''},700)">CALIBRATE</button>
+    </div>
+    <button class="end-btn" id="next-player-btn" onclick="advanceTurn()" style="display:none;">NEXT PLAYER →</button>
+    <button class="end-btn" onclick="showLog()" style="border-color:rgba(255,185,56,.6);color:var(--bb-amber);">Show Throw Log</button>
+    <button class="end-btn" onclick="endGame()">End Game</button>
+  </div>
+</div>
+
+<!-- WINNER -->
+<div id="winner" class="screen">
+  <div class="winner-layout">
+    <div class="win-card" style="width:100%;">
+      <div class="win-trophy">🏆</div>
+      <div class="win-label">BALL GAME</div>
+      <div class="win-name" id="win-name">—</div>
+      <div id="win-score">—</div>
+      <div class="win-score" id="win-details">—</div>
+    </div>
+
+    <div id="win-linescore"></div>
+    <div id="win-session" style="display:none;"></div>
+    <div id="win-others"></div>
+
+    <div class="setup-card" style="width:100%;margin-top:4px;">
+      <h3>Next Game Roster</h3>
+      <div id="player-list-winner"></div>
+      <div class="add-btns">
+        <button class="add-btn" id="add-human-btn-w" onclick="openHumanModal()">+ Human Player</button>
+        <button class="add-btn" id="add-cpu-btn-w" onclick="openCpuModal()">+ Computer Player</button>
+      </div>
+      <div id="recent-players-winner" class="recent-players"></div>
+    </div>
+
+    <div id="cpu-auto-msg" style="display:none;text-align:center;color:var(--muted);font-family:'Share Tech Mono',monospace;font-size:13px;padding:4px 0;"></div>
+    <div class="win-buttons">
+      <button class="win-btn win-btn-primary" id="next-leg-btn" onclick="nextLeg()" style="font-size:18px;padding:20px;">PLAY AGAIN</button>
+      <button class="win-btn" id="cpu-stop-btn" onclick="stopCpuAuto()" style="display:none;">STOP AUTO</button>
+      <button class="win-btn win-btn-danger" onclick="goToMenu()">MENU</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOG MODAL -->
+<div id="log-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:999;align-items:center;justify-content:center;flex-direction:column;padding:20px;backdrop-filter:blur(4px);">
+  <h2 style="color:var(--blue);font-family:'Orbitron',monospace;margin-bottom:16px;">Raw Throw Log</h2>
+  <textarea id="log-output" style="width:min(800px,90%);height:60vh;background:var(--bg2);color:var(--green);font-family:'Share Tech Mono',monospace;padding:16px;border:2px solid var(--border2);border-radius:12px;outline:none;resize:none;"></textarea>
+  <div style="display:flex;gap:14px;margin-top:20px;">
+    <button class="win-btn win-btn-primary" onclick="copyLog()">Copy to Clipboard</button>
+    <button class="win-btn" onclick="closeLog()">Close</button>
+  </div>
+</div>
+
+<!-- STATS MODAL -->
+<div id="stats-modal" class="modal-overlay" style="display:none;">
+  <div class="stats-modal-box">
+    <h2>BASEBALL STATS</h2>
+    <div id="stats-content"></div>
+    <div style="display:flex;gap:12px;margin-top:20px;justify-content:center;flex-wrap:wrap;">
+      <button class="win-btn" onclick="closeStatsModal()">CLOSE</button>
+    </div>
+  </div>
+</div>
+
+<div id="inning-flash"></div>
+<div id="confetti"></div>
+<div id="announce"></div>
+<div id="broadcast-event" aria-live="polite">
+  <div class="be-kicker" id="be-kicker"></div>
+  <div class="be-main" id="be-main"></div>
+  <div class="be-sub" id="be-sub"></div>
+</div>
+<script src="../assets/js/baseball.js?v=1"></script>
+</body>
+</html>

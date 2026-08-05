@@ -1,0 +1,552 @@
+/* baseball.css — Baseball game screen + broadcast winner theme.
+   Setup, modals and the shared chrome come from game.css.
+
+   Baseball is themed-only: it is 2-player exclusively, so the broadcast HUD
+   IS the game. There is no enhanced/stock toggle and therefore none of
+   Cricket's "toggling off must reproduce stock" scoping constraint.
+
+   Design rules (inherited from Cricket's enhanced mode, hard-won on a
+   1920x1080 TV viewed across a bright room):
+     - Solid bright fills with DARK text survive glare; glows do not.
+     - Flat matte navy panels, no glass/translucency.
+     - Heavy type, readable at 3-4 m.
+     - Air-mouse-friendly hit targets.
+   Built and checked at 1920x1080.
+   ────────────────────────────────────────────────────────────── */
+
+:root {
+  --bb-bg-hi: #182a45;
+  --bb-bg-lo: #0c1626;
+  --bb-panel: #16263d;
+  --bb-panel-2: #1d3050;
+  --bb-line: rgba(255,255,255,.16);
+  --bb-amber: #ffb938;
+  --bb-blue: #38b1ff;
+  --bb-green: #3ddc6a;
+  --bb-red: #ff4655;
+  --bb-ink: #0a0c10;
+  --bb-dim: rgba(214,228,242,.72);
+}
+
+/* NOTE: no `display` override here — an id-level display rule beats
+   .screen{display:none} and leaves the board on top of the winner screen.
+   (That exact bug bit Cricket's enhanced mode.) */
+#game {
+  flex-direction: row;
+  height: 100vh;
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--bb-bg-hi), var(--bb-bg-lo) 72%);
+  color: #f7fbff;
+}
+
+#bb-board {
+  flex: 1; min-width: 0;
+  display: grid;
+  grid-template-rows: 62px minmax(0, 1fr) auto;
+  gap: 14px;
+  padding: 16px 18px 18px;
+  overflow: hidden;
+}
+
+/* ── TOP BAR ──────────────────────────────────────────────── */
+.bb-topbar {
+  display: grid;
+  grid-template-columns: 1fr minmax(420px, 560px) 1fr;
+  align-items: center;
+}
+.bb-brand {
+  font-family: 'Exo 2', sans-serif;
+  font-style: italic; font-weight: 900;
+  font-size: 26px; line-height: 1;
+}
+.bb-brand span:first-child { color: #fff; }
+.bb-brand span:nth-child(2) { color: var(--bb-amber); }
+.bb-brand small {
+  display: block; margin-top: 5px;
+  font: 700 11px 'Exo 2', sans-serif; font-style: normal;
+  letter-spacing: 2px; color: var(--bb-dim);
+}
+.bb-match-strip {
+  height: 54px;
+  display: grid; grid-template-columns: 1fr 220px 1fr;
+  border: 1px solid var(--bb-line);
+  border-radius: 10px; overflow: hidden;
+  background: var(--bb-panel);
+}
+.bb-match-cell {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 2px;
+  color: var(--bb-dim);
+  font: 800 12px 'Exo 2', sans-serif; letter-spacing: 2px;
+}
+.bb-match-cell strong {
+  color: #fff; font-size: 20px; letter-spacing: 1px; line-height: 1.1;
+}
+.bb-match-title {
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bb-amber); color: var(--bb-ink);
+  font: 900 26px 'Exo 2', sans-serif; letter-spacing: 3px;
+}
+.bb-topbar-right { display: flex; justify-content: flex-end; align-items: center; }
+.bb-leg-badge {
+  background: var(--bb-panel-2);
+  border: 1px solid var(--bb-line); border-radius: 999px;
+  padding: 8px 18px;
+  font: 900 14px 'Exo 2', sans-serif; letter-spacing: 3px;
+  color: var(--bb-amber);
+}
+
+/* ── MAIN ROW: team | inning hero | team ──────────────────── */
+.bb-main {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) minmax(360px, 460px) minmax(280px, 1fr);
+  gap: 18px;
+  min-height: 0;
+}
+.bb-team-slot { min-width: 0; display: flex; }
+
+.bb-team {
+  flex: 1; min-width: 0;
+  display: grid;
+  grid-template-rows: 62px minmax(0, 1fr) 68px;
+  border: 1px solid var(--bb-line);
+  border-left: 6px solid var(--bb-amber);
+  border-radius: 14px;
+  background: linear-gradient(180deg, var(--bb-panel-2), var(--bb-panel));
+  overflow: hidden;
+  transition: filter .25s;
+}
+#bb-team-slot-1 .bb-team {
+  border-left: 1px solid var(--bb-line);
+  border-right: 6px solid var(--bb-blue);
+}
+.bb-team:not(.on-throw) { filter: brightness(.82) saturate(.75); }
+
+/* Name bar: solid accent, dark ink — the daylight-proof element */
+.bb-team-name {
+  display: flex; align-items: center; gap: 14px;
+  min-width: 0;
+  padding: 0 22px 6px;
+  background: var(--bb-amber);
+  color: var(--bb-ink);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 86%);
+}
+#bb-team-slot-1 .bb-team-name {
+  background: var(--bb-blue);
+  flex-direction: row-reverse;
+  clip-path: polygon(0 0, 100% 0, 100% 86%, 0 100%);
+}
+.bb-team-badge {
+  width: 40px; height: 26px; flex-shrink: 0;
+  margin-bottom: 6px;   /* clears the angled clip on the name bar */
+  display: flex; align-items: center; justify-content: center;
+}
+.bb-team-label {
+  flex: 1; min-width: 0;
+  font: 900 clamp(24px, 2.1vw, 38px) 'Exo 2', sans-serif;
+  line-height: 1; text-transform: uppercase; letter-spacing: .5px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#bb-team-slot-1 .bb-team-label { text-align: right; }
+.bb-team.on-throw .bb-team-name::after {
+  content: "ON THROW";
+  flex: none;
+  background: var(--bb-ink); color: var(--bb-amber);
+  font: 900 14px/1 'Exo 2', sans-serif; letter-spacing: 2px;
+  padding: 8px 14px 7px; border-radius: 999px;
+}
+#bb-team-slot-1 .bb-team.on-throw .bb-team-name::after { color: var(--bb-blue); }
+
+.bb-team-body {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  min-height: 0; gap: 2px;
+}
+.bb-runs-label {
+  font: 800 13px 'Exo 2', sans-serif;
+  letter-spacing: 6px; color: var(--bb-dim);
+}
+.bb-runs {
+  font-family: 'Exo 2', sans-serif; font-weight: 900;
+  font-size: clamp(96px, 10vw, 190px);
+  line-height: .82; letter-spacing: -3px;
+  color: #fff;
+  text-shadow: 0 4px 0 rgba(0,0,0,.3);
+}
+.bb-runs.bump { animation: bbBump .42s cubic-bezier(.34,1.56,.64,1); }
+@keyframes bbBump {
+  0%   { transform: scale(1);    }
+  45%  { transform: scale(1.14); }
+  100% { transform: scale(1);    }
+}
+
+.bb-team-stats {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  border-top: 1px solid var(--bb-line);
+  background: rgba(0,0,0,.28);
+}
+.bb-team-stats div {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 3px;
+  padding: 6px 0;
+}
+.bb-team-stats div + div { border-left: 1px solid var(--bb-line); }
+.bb-team-stats span {
+  font: 800 11px 'Exo 2', sans-serif;
+  letter-spacing: 2px; color: var(--bb-dim);
+}
+.bb-team-stats strong {
+  font: 900 24px 'Exo 2', sans-serif; color: #fff; line-height: 1;
+}
+
+/* ── INNING HERO (centre column) ──────────────────────────── */
+#bb-hero {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 6px; min-height: 0;
+  border: 1px solid var(--bb-line);
+  border-radius: 14px;
+  background: var(--bb-panel);
+  padding: 14px 18px 18px;
+}
+.bb-hero-kicker {
+  background: #fff; color: var(--bb-ink);
+  font: 900 16px 'Exo 2', sans-serif; letter-spacing: 4px;
+  padding: 7px 20px 6px; border-radius: 999px;
+}
+#bb-hero.bull-inning .bb-hero-kicker { background: var(--bb-amber); }
+.bb-hero-target {
+  font-family: 'Exo 2', sans-serif; font-weight: 900;
+  font-size: clamp(110px, 12vw, 210px);
+  line-height: .88; letter-spacing: -4px;
+  color: #fff;
+}
+.bb-hero-target.is-bull {
+  font-size: clamp(64px, 7vw, 120px);
+  letter-spacing: 2px;
+  color: var(--bb-amber);
+}
+.bb-hero-sub {
+  font: 900 clamp(16px, 1.4vw, 24px) 'Exo 2', sans-serif;
+  letter-spacing: 4px; color: var(--bb-dim);
+  text-align: center;
+}
+
+/* 3-dart strip lives on the board (glance-able from the oche), not the
+   operator side panel. */
+.bb-hero-darts {
+  margin-top: 12px;
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 10px; width: 100%;
+}
+.bb-hd {
+  min-height: 72px;
+  border: 2px solid var(--bb-line); border-radius: 10px;
+  background: var(--bb-panel-2);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 2px;
+  transition: background .18s, border-color .18s;
+}
+.bb-hd-val {
+  font: 900 26px 'Exo 2', sans-serif; color: var(--bb-dim); line-height: 1;
+}
+.bb-hd-runs {
+  font: 900 15px 'Exo 2', sans-serif; letter-spacing: 1px;
+  color: var(--bb-green); min-height: 15px;
+}
+.bb-hd.scored { background: var(--bb-green); border-color: var(--bb-green); }
+.bb-hd.scored .bb-hd-val,
+.bb-hd.scored .bb-hd-runs { color: var(--bb-ink); }
+.bb-hd.hit    { background: var(--bb-panel-2); border-color: rgba(255,255,255,.42); }
+.bb-hd.hit .bb-hd-val { color: #fff; }
+.bb-hd.miss   { background: rgba(255,70,85,.18); border-color: var(--bb-red); }
+.bb-hd.miss .bb-hd-val { color: var(--bb-red); }
+
+/* ── LINE SCORE (the centrepiece) ─────────────────────────── */
+#bb-linescore {
+  border: 1px solid var(--bb-line);
+  border-radius: 14px;
+  background: var(--bb-panel);
+  padding: 10px 12px 12px;
+  overflow: hidden;
+}
+/* Long sudden-death games add inning columns. Shrink the box score to keep it
+   whole on screen rather than scrolling it — content you have to scroll to on a
+   TV across the room may as well not be there. Set by renderLineScore(). */
+#bb-linescore.cols-wide  .bb-ls-cell  { height: 68px; font-size: clamp(22px, 1.9vw, 34px); }
+#bb-linescore.cols-wide  .bb-ls-total { height: 68px; font-size: clamp(26px, 2.2vw, 40px); }
+#bb-linescore.cols-wide  .bb-ls-corner, #bb-linescore.cols-wide  .bb-ls-name { width: 180px; }
+#bb-linescore.cols-wide  .bb-ls-name  { font-size: clamp(15px, 1.2vw, 21px); }
+#bb-linescore.cols-wide  thead th     { font-size: 15px; }
+#bb-linescore.cols-xwide .bb-ls-cell  { height: 54px; font-size: clamp(15px, 1.3vw, 24px); }
+#bb-linescore.cols-xwide .bb-ls-total { height: 54px; font-size: clamp(18px, 1.5vw, 28px); }
+#bb-linescore.cols-xwide .bb-ls-corner, #bb-linescore.cols-xwide .bb-ls-name { width: 140px; }
+#bb-linescore.cols-xwide .bb-ls-name  { font-size: clamp(12px, 1vw, 17px); }
+#bb-linescore.cols-xwide thead th     { font-size: 12px; }
+#bb-linescore.cols-xwide .bb-ls       { border-spacing: 2px; }
+.bb-ls {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 4px;
+  table-layout: fixed;
+}
+.bb-ls th, .bb-ls td { text-align: center; }
+.bb-ls-corner, .bb-ls-name { width: 250px; }
+.bb-ls-total, .bb-ls-total-hd { width: 130px; }
+
+.bb-ls thead th {
+  font: 900 20px 'Exo 2', sans-serif;
+  letter-spacing: 1px; color: var(--bb-dim);
+  padding: 6px 0 8px;
+  border-bottom: 2px solid var(--bb-line);
+}
+.bb-ls-corner {
+  font: 800 12px 'Exo 2', sans-serif !important;
+  letter-spacing: 4px; text-align: left !important;
+  padding-left: 8px !important;
+}
+.bb-ls thead th.bull { color: var(--bb-amber); }
+.bb-ls thead th.now {
+  background: #fff; color: var(--bb-ink);
+  border-radius: 6px 6px 0 0;
+}
+.bb-ls-total-hd { color: #fff !important; }
+
+.bb-ls-name {
+  font: 900 clamp(20px, 1.7vw, 30px) 'Exo 2', sans-serif;
+  text-transform: uppercase; letter-spacing: .5px;
+  text-align: left !important;
+  padding: 0 10px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  border-left: 6px solid var(--bb-amber);
+  color: #fff;
+}
+.bb-ls-p1 .bb-ls-name { border-left-color: var(--bb-blue); }
+.bb-ls-row:not(.now) { opacity: .78; }
+
+.bb-ls-cell {
+  height: 88px;
+  font: 900 clamp(30px, 2.6vw, 46px) 'Exo 2', sans-serif;
+  line-height: 1;
+  border-radius: 8px;
+  background: rgba(255,255,255,.05);
+  color: #fff;
+}
+.bb-ls-cell.empty { color: rgba(255,255,255,.22); background: rgba(255,255,255,.03); }
+.bb-ls-cell.zero  { color: rgba(255,255,255,.55); }
+.bb-ls-cell.max   { background: var(--bb-amber); color: var(--bb-ink); }
+.bb-ls-cell.now   { background: rgba(255,255,255,.16); box-shadow: inset 0 0 0 2px #fff; }
+.bb-ls-cell.now.max { background: var(--bb-amber); box-shadow: inset 0 0 0 2px #fff; }
+
+.bb-ls-total {
+  height: 88px;
+  font: 900 clamp(36px, 3.2vw, 58px) 'Exo 2', sans-serif;
+  line-height: 1;
+  border-radius: 8px;
+  background: var(--bb-amber); color: var(--bb-ink);
+}
+.bb-ls-p1 .bb-ls-total { background: var(--bb-blue); }
+
+/* ── SIDE PANEL (operator area) ───────────────────────────── */
+#side-panel {
+  width: 260px; flex-shrink: 0;
+  background: var(--bb-panel);
+  border-left: 1px solid var(--bb-line);
+  display: flex; flex-direction: column;
+  padding: 16px; gap: 12px; overflow: hidden;
+}
+.panel-label {
+  font: 800 11px 'Exo 2', sans-serif;
+  letter-spacing: 4px; color: var(--bb-dim);
+  text-transform: uppercase; margin-bottom: 6px;
+}
+.turn-info, .target-box, .round-box, .keypad-wrap {
+  background: var(--bb-panel-2);
+  border: 1px solid var(--bb-line);
+  border-radius: 10px;
+}
+.turn-info { padding: 12px; text-align: center; }
+.turn-player {
+  font: 900 22px 'Exo 2', sans-serif; color: #fff;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.turn-player.cpu-turn { color: var(--bb-dim); }
+.turn-sub { font-size: 13px; color: var(--bb-dim); margin-top: 4px; }
+
+.bb-side-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.target-box, .round-box { padding: 10px; text-align: center; }
+.target-label, .round-sub {
+  font: 800 10px 'Exo 2', sans-serif; letter-spacing: 3px; color: var(--bb-dim);
+}
+.target-val, .round-num {
+  font: 900 34px 'Exo 2', sans-serif; color: #fff; line-height: 1.1;
+}
+.target-val.bull { color: var(--bb-amber); font-size: 26px; }
+
+/* ── KEYPAD ──────────────────────────────────────────────── */
+.keypad-wrap { display: flex; flex-direction: column; gap: 5px; padding: 7px; }
+.keypad-row { display: flex; gap: 5px; }
+.kp-btn {
+  flex: 1; padding: 7px 0;
+  background: var(--bb-panel);
+  border: 1px solid rgba(255,255,255,.22); border-radius: 6px;
+  color: #fff; font-family: 'Exo 2', sans-serif;
+  font-size: 12px; font-weight: 800; cursor: pointer; transition: all .15s;
+}
+.kp-btn:hover  { background: #fff; color: var(--bb-ink); }
+.kp-miss:hover { background: var(--bb-red); color: #fff; }
+.kp-mod.active { background: var(--bb-amber); border-color: var(--bb-amber); color: var(--bb-ink); }
+.kp-undo       { border-color: rgba(255,185,56,.6); color: var(--bb-amber); }
+.kp-undo:hover { background: var(--bb-amber); color: var(--bb-ink); }
+
+.end-btn {
+  padding: 11px; background: none;
+  border: 1px solid rgba(255,255,255,.22); border-radius: 10px;
+  color: var(--bb-dim); font-family: 'Exo 2', sans-serif;
+  font-size: 13px; font-weight: 800; cursor: pointer;
+  transition: all .2s; letter-spacing: 1px;
+}
+.end-btn:hover { border-color: var(--bb-red); color: var(--bb-red); }
+#next-player-btn {
+  background: var(--bb-green); border-color: var(--bb-green);
+  color: var(--bb-ink); font-weight: 900; letter-spacing: 2px;
+}
+#next-player-btn:hover { filter: brightness(1.08); border-color: var(--bb-green); color: var(--bb-ink); }
+
+.game-ws { display: flex; align-items: center; gap: 8px; margin-top: auto; }
+
+/* ── INNING FLASH ────────────────────────────────────────── */
+#inning-flash {
+  position: fixed; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 400; pointer-events: none;
+  font-family: 'Exo 2', sans-serif; font-weight: 900;
+  font-size: clamp(140px, 24vw, 300px);
+  line-height: 1; text-align: center; opacity: 0;
+}
+#inning-flash.pop { animation: bbInningPop 2s cubic-bezier(.22,1,.36,1) forwards; }
+@keyframes bbInningPop {
+  0%   { transform: translate(-50%, -50%) scale(.3); opacity: 0; }
+  18%  { transform: translate(-50%, -50%) scale(1.06); opacity: 1; }
+  70%  { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(.92); opacity: 0; }
+}
+
+/* ── SETUP TWEAKS ────────────────────────────────────────── */
+.bb-rules {
+  display: grid; grid-template-columns: repeat(2, 1fr);
+  gap: 10px 24px;
+  font-size: 16px; line-height: 1.5; color: #fff;
+}
+.bb-rules div { display: flex; gap: 10px; }
+.bb-rules b { color: var(--gold); flex-shrink: 0; }
+#roster-hint {
+  margin-top: 12px; font-size: 14px; color: var(--muted); opacity: .8;
+}
+
+/* ── SESSION SCORE (winner screen) ───────────────────────── */
+#win-session { width: 100%; text-align: center; padding: 10px 0 2px; }
+.session-score {
+  font: 900 clamp(16px, 3vw, 22px) 'Exo 2', sans-serif;
+  color: var(--bb-amber); letter-spacing: 2px;
+}
+.session-score strong { font-size: 1.25em; }
+
+/* ═══════════════════════════════════════════════════════════
+   WINNER SCREEN — broadcast takeover.
+   body.bb-winner is set on the win, cleared on every exit path.
+   bb-win-p1 flips the accent to the blue (right-hand) player.
+   ═══════════════════════════════════════════════════════════ */
+body.bb-winner #winner {
+  position: relative; overflow: hidden;
+  background: linear-gradient(180deg, #182a45, #0c1626 72%);
+}
+body.bb-winner #winner::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(ellipse 70% 55% at 50% 22%, rgba(255,185,56,.28), transparent 60%),
+    repeating-linear-gradient(115deg, rgba(255,255,255,.03) 0 2px, transparent 2px 26px);
+}
+body.bb-winner.bb-win-p1 #winner::before {
+  background:
+    radial-gradient(ellipse 70% 55% at 50% 22%, rgba(56,177,255,.3), transparent 60%),
+    repeating-linear-gradient(115deg, rgba(255,255,255,.03) 0 2px, transparent 2px 26px);
+}
+body.bb-winner .winner-layout { position: relative; z-index: 1; max-width: 1000px; }
+body.bb-winner .win-card {
+  background: transparent; border: 0; box-shadow: none;
+  border-radius: 0; padding: 8px 0 4px;
+}
+body.bb-winner .win-trophy { font-size: 34px; margin-bottom: 0; }
+body.bb-winner .win-label {
+  display: inline-block;
+  background: var(--bb-amber); color: var(--bb-ink);
+  font: 900 17px 'Exo 2', sans-serif; letter-spacing: 5px;
+  padding: 7px 20px 6px; border-radius: 999px; margin-bottom: 8px;
+}
+body.bb-winner.bb-win-p1 .win-label { background: var(--bb-blue); }
+body.bb-winner .win-name {
+  font-family: 'Exo 2', sans-serif; font-weight: 900;
+  font-size: clamp(42px, 4.6vw, 76px);
+  line-height: .92; text-transform: uppercase; color: #fff;
+}
+#win-score {
+  font: 900 clamp(44px, 4.8vw, 84px) 'Exo 2', sans-serif;
+  color: var(--bb-amber); line-height: 1; margin-top: 8px; letter-spacing: 2px;
+}
+body.bb-winner.bb-win-p1 #win-score { color: var(--bb-blue); }
+body.bb-winner .win-score { color: rgba(222,234,246,.9); font-size: 17px; margin-top: 10px; }
+body.bb-winner .win-other-card {
+  background: var(--bb-panel);
+  border: 1px solid var(--bb-line); border-radius: 10px;
+}
+body.bb-winner #win-session { color: var(--bb-amber); }
+body.bb-winner .winner-layout .setup-card {
+  background: #121f33; border: 1px solid rgba(255,255,255,.14);
+}
+body.bb-winner .win-btn {
+  background: var(--bb-panel);
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 10px; color: #f7fbff;
+}
+body.bb-winner .win-btn-primary {
+  background: var(--bb-amber); border-color: var(--bb-amber);
+  color: var(--bb-ink); font-weight: 900;
+}
+body.bb-winner.bb-win-p1 .win-btn-primary {
+  background: var(--bb-blue); border-color: var(--bb-blue);
+}
+body.bb-winner .win-btn-primary:hover {
+  transform: translateY(-3px); filter: brightness(1.08);
+  box-shadow: 0 8px 24px rgba(0,0,0,.4);
+}
+
+/* Final box score on the winner screen — the story of the game.
+   flex-shrink:0 is load-bearing: .winner-layout is a flex column, so without it
+   the table gets squeezed and the second player's row is clipped away. */
+#win-linescore {
+  width: 100%;
+  flex-shrink: 0;
+  border: 1px solid var(--bb-line);
+  border-radius: 12px;
+  background: var(--bb-panel);
+  padding: 8px 10px 10px;
+  overflow-x: auto;
+}
+#win-linescore .bb-ls-corner, #win-linescore .bb-ls-name { width: 170px; }
+#win-linescore .bb-ls-total, #win-linescore .bb-ls-total-hd { width: 80px; }
+#win-linescore .bb-ls thead th { font-size: 14px; padding: 4px 0 6px; }
+#win-linescore .bb-ls-name { font-size: 18px; }
+#win-linescore .bb-ls-cell { height: 42px; font-size: 24px; }
+#win-linescore .bb-ls-total { height: 42px; font-size: 28px; }
+#win-linescore .bb-ls-row { opacity: 1; }
+/* Same graceful shrink as the live board when sudden death adds columns */
+#win-linescore.cols-wide  .bb-ls-corner, #win-linescore.cols-wide  .bb-ls-name { width: 120px; }
+#win-linescore.cols-wide  .bb-ls-cell,  #win-linescore.cols-wide  .bb-ls-total { height: 36px; font-size: 19px; }
+#win-linescore.cols-wide  .bb-ls-name { font-size: 14px; }
+#win-linescore.cols-wide  .bb-ls thead th { font-size: 12px; }
+#win-linescore.cols-xwide .bb-ls-corner, #win-linescore.cols-xwide .bb-ls-name { width: 96px; }
+#win-linescore.cols-xwide .bb-ls-cell,  #win-linescore.cols-xwide .bb-ls-total { height: 30px; font-size: 14px; }
+#win-linescore.cols-xwide .bb-ls-name { font-size: 11px; }
+#win-linescore.cols-xwide .bb-ls thead th { font-size: 10px; }
+#win-linescore.cols-xwide .bb-ls { border-spacing: 2px; }

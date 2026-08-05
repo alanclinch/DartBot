@@ -1,9 +1,20 @@
-# Handover — Baseball (NEW GAME, to be built)
+# Handover — Baseball
 
-You're building a **brand-new game, Baseball**, for DartBot, in **Claude Code (VS Code)**. Nothing
-exists yet — this doc is the full spec and build plan. Read `CLAUDE.md` (repo root) first for
-project-wide context, deployment, conventions, and the **working principles** (especially: *ask,
-don't assume*; match solution to problem; don't touch unrelated code; **the bots are sacred**).
+> ## ✅ BUILT — 2026-08-05
+> Baseball is **live**: `games/baseball.html`, `assets/js/baseball.js`, `assets/css/baseball.css`,
+> linked from `index.html`. Built to the spec below; **all four open items were confirmed with the
+> owner** and are recorded under "Decisions made" at the bottom of this doc. Cricket's
+> `cricket-bots.js` was not touched.
+>
+> **Not yet played on the real board** — it has been validated headlessly and visually at 1920×1080,
+> but never against live Autodarts WS traffic. First board session is the outstanding test.
+>
+> The rest of this doc is kept as the design rationale + the map back to its ancestors
+> (`aroundtheclock.js` for the engine, Cricket's enhanced mode for the look).
+
+The original brief follows. Read `CLAUDE.md` (repo root) first for project-wide context,
+deployment, conventions, and the **working principles** (especially: *ask, don't assume*; match
+solution to problem; don't touch unrelated code; **the bots are sacred**).
 
 **The one-line summary:** Baseball is mechanically **ATC's "Score Attack" reskinned** (a scoring race
 over fixed rounds, ties → sudden-death Bull) wearing **Cricket's 2-player enhanced broadcast look**.
@@ -208,14 +219,66 @@ pulse the `.ws-dot` (liveness) via the shared helper.
 
 ---
 
-## Open items to confirm with the owner (don't guess)
-1. **Themed-only vs a toggle** — the "no enhanced toggle" decision above. Recommend themed-only; confirm.
-2. **Grand-slam flourish** — the owner chose the base ruleset without the grand-slam *bonus*, but a
-   visual/audio **flourish** for 3 triples in an inning (no extra runs) would suit the broadcast feel.
-   Ask if they want it.
-3. **Sudden-death format** — extra full bull innings (3 darts each, most runs, repeat) vs a single
-   closest-bull dart. Recommend the former (consistent with the inning-10 mechanic); confirm.
-4. **Stat shown on cards** — total runs only, or add a runs-per-inning / "batting average"-style stat.
+## Decisions made (confirmed with the owner, 2026-08-05 — all four now closed)
+1. **Themed-only, no toggle.** The broadcast HUD is the only look. Consequently `baseball.css`
+   deliberately sets **no `display` rule on `#game`** — an id-level `display` outranks
+   `.screen{display:none}` and leaves the board sitting on top of the winner screen. That is exactly
+   the bug that made Cricket "have no end-game screen". There is a comment in the file saying so;
+   don't remove it.
+2. **Sudden death = extra full Bull innings.** 3 darts each, outer 1 / inner 2, repeat until someone
+   leads after a *completed* extra inning. Implemented by simply letting `inning` run past 10 rather
+   than forking into ATC's separate dead-heat state — extras are just more innings, and the line
+   score grows columns for them (11, 12, …).
+3. **Grand-slam flourish: yes, visual + audio, no bonus runs.** `GRAND SLAM` broadcast overlay +
+   voice on a 9-run inning. A 6-run bull inning gets the analogous `PERFECT INNING` flourish.
+4. **Stat = runs + RPI** (runs per inning), on the team panels and the winner screen. **MPR is never
+   shown anywhere** — it is Cricket's metric and would mislead (ATC's known bug). The CPU picker
+   shows a relative strength label/bar derived from `BOT_TIERS` sigma, not an MPR figure.
+
+## How it was validated (no board at the dev machine)
+- **Headless engine harness** — a `vm` sandbox with a stub DOM and virtual timers loads the real
+  `utils.js` + `baseball-bots.js` + `baseball.js` and plays full games. Covered: scoring rules,
+  700 CPU-vs-CPU games asserting `runs === sum(inningRuns)` / 3 darts per inning / per-inning run
+  caps / a decided winner, tie → extra innings (25/300 even matchups went to extras, all resolved),
+  undo, and a monotonic difficulty ladder. The harness lives in the scratchpad, not the repo — it is
+  cheap to rebuild and the repo has no test runner. Note: engine state is `let`-declared, so a vm
+  harness must read it by evaluating **in context**, not off the sandbox object.
+- **Visual** — headless Chrome at exactly 1920×1080 for the setup screen, mid-game board, the bull
+  inning, and the winner screen. Two real defects were caught this way: the winner-screen box score
+  being clipped (`.winner-layout` is a flex column — `#win-linescore` needs `flex-shrink: 0`), and
+  the name-bar badges being shaved by the angled `clip-path`.
+
+## External review (OpenAI Codex, 2026-08-05)
+The build was put through an adversarial review by Codex, then a second round where it was given a
+writable throwaway copy and told to prove its claims by execution. Outcome: six findings, five
+accepted, and the sixth resolved into a better fix than either side originally proposed. See the
+CHANGELOG entry for the full list. The two things worth carrying forward:
+
+- **Baseball's takeout handling now deliberately diverges from the other games.** On
+  `Takeout finished` with a part-finished visit, Baseball pads the visit out with misses before
+  advancing; Cricket/ATC/Demolish just advance and silently lose the unthrown darts. Do **not**
+  "resync" this back to the house pattern without reading why: in inning 10 the old behaviour could
+  decide a match off a one-dart visit, and padding keeps `darts === innings × 3` true.
+- **A claim in an earlier draft of this doc was wrong** and is corrected here: blocking the takeout
+  advance would *not* leave a player unrecoverable. Manual `MISS` on the keypad and `Space`/`Enter`
+  both fill or end a visit. That was demonstrated by running it, not argued.
+
+## Still open / watch items
+- **Never run against the live board.** The WS path now has its own harness (`sim-baseball-ws.js`
+  in the scratchpad — normal visit, partial visit + takeout, stray takeout, the no-segment
+  debounce, an inning-10 short visit, board noise without a takeout event, and End Game during the
+  winner delay), but a stub is not a board. First board session: confirm the turn advances on
+  takeout, that a short visit is padded as expected, and that the last dart of a decided match ends
+  the game cleanly.
+- **Sudden death can run long** between weak bots — both sides can miss the bull for many innings
+  (a simulated cpu0-vs-cpu0 tie once reached inning 26). Human play is far shorter. Left uncapped
+  because capping it is a rules decision for the owner, not an implementation detail.
+- **No cloud stats.** localStorage only (`dartbot_baseball_players`, plus a name/flag write into the
+  shared `dartbot_players` so the player appears in other games' recent chips). If Neon is ever added
+  it must use dedicated `baseball_*` columns — see the ATC contamination warning above.
+- **`baseball-bots.js` tiers are Cricket's originals, untuned for Baseball.** They already give a
+  clean ladder (≈5 runs for cpu0 up to ≈38 for cpu8 over 10 innings), so nothing was changed. Retune
+  freely if the feel is off — that file is isolated and cannot affect Cricket.
 
 ---
 
