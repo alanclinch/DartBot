@@ -433,11 +433,11 @@
 }
 
 /* ── SETUP: HOW IT PLAYS ─────────────────────────────────── */
-/* Four bright bars with dark ink — the same glare-proof grammar as the in-game
-   name bars, applied to text. Amber is the number marker ONLY: scattering it
+/* Four stacked rule bars. Amber is the number marker ONLY: scattering it
    through the sentence (an earlier attempt) reads as noise rather than
    structure, because bolding inside flowing prose speckles it instead of
-   giving the eye an entry point. Sudden death is deliberately not on this
+   giving the eye an entry point. Bars match .player-row below them so the
+   setup screen reads as one thing. Sudden death is deliberately not on this
    card — it only matters if it happens, and the board announces it. */
 .bb-rules {
   display: grid; gap: 10px;
@@ -448,9 +448,10 @@
   align-items: center;
   min-height: 58px;
   padding: 11px 18px 11px 10px;
-  border-radius: 9px;
-  background: #f2ece0;
-  color: var(--bb-ink);
+  border-radius: 10px;
+  background: var(--surface2);
+  border: 2px solid var(--border);
+  color: #fff;
   font: 800 22px/1.3 'Exo 2', sans-serif;
 }
 .bb-rule-n {
