@@ -433,16 +433,34 @@
 }
 
 /* ── SETUP: HOW IT PLAYS ─────────────────────────────────── */
-/* Plain prose. A previous version used tag pills and a 5-cell scoring table;
-   it looked tidier but read slower — a chart you have to decode is worse than
-   three sentences you just read. */
+/* Four bright bars with dark ink — the same glare-proof grammar as the in-game
+   name bars, applied to text. Amber is the number marker ONLY: scattering it
+   through the sentence (an earlier attempt) reads as noise rather than
+   structure, because bolding inside flowing prose speckles it instead of
+   giving the eye an entry point. Sudden death is deliberately not on this
+   card — it only matters if it happens, and the board announces it. */
 .bb-rules {
-  font-size: 19px;
-  line-height: 1.65;
-  color: #fff;
-  max-width: 68ch;
+  display: grid; gap: 10px;
+  margin: 0; padding: 0; list-style: none;
 }
-.bb-rules b { color: var(--bb-amber); font-weight: 800; }
+.bb-rules li {
+  display: grid; grid-template-columns: 46px 1fr;
+  align-items: center;
+  min-height: 58px;
+  padding: 11px 18px 11px 10px;
+  border-radius: 9px;
+  background: #f2ece0;
+  color: var(--bb-ink);
+  font: 800 22px/1.3 'Exo 2', sans-serif;
+}
+.bb-rule-n {
+  display: grid; place-items: center;
+  width: 34px; height: 34px;
+  border-radius: 6px;
+  background: var(--bb-amber); color: var(--bb-ink);
+  font: 900 21px 'Exo 2', sans-serif;
+}
+.bb-rules b { font-weight: 900; }
 
 #roster-hint {
   margin-top: 12px; font-size: 14px; color: var(--muted); opacity: .8;
