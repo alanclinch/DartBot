@@ -19,7 +19,14 @@
 // =============================================
 
 const INNING_TARGETS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 25]; // inning 1..10
-const REG_INNINGS = 10;   // innings 11+ are sudden-death bull innings
+const REG_INNINGS = 10;   // innings 11+ are sudden death
+// Sudden death repeats the Bull, but weak players score ~0 there, so two of them
+// can trade zeros for a very long time (a simulation reached inning 26). After
+// three tied Bull extras, fall back to the 20 — the bed everyone can actually
+// hit — so the game separates instead of stalling. Full innings throughout;
+// only the target changes.
+const SD_BULL_INNINGS = 3;
+const SD_FALLBACK_TARGET = 20;
 const MAX_PLAYERS = 2;
 const MIN_PLAYERS = 2;
 const LS_KEY = 'dartbot_baseball_players';
@@ -129,7 +136,8 @@ function escapeHTML(s) {
   return String(s).replace(/[&<>'"]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[m]));
 }
 function targetForInning(n) {
-  return n <= REG_INNINGS ? INNING_TARGETS[n - 1] : 25;
+  if (n <= REG_INNINGS) return INNING_TARGETS[n - 1];
+  return (n <= REG_INNINGS + SD_BULL_INNINGS) ? 25 : SD_FALLBACK_TARGET;
 }
 function isBullInning(n) { return targetForInning(n) === 25; }
 
@@ -552,7 +560,7 @@ function updateHero() {
 
   if (inning > REG_INNINGS) {
     kicker.textContent = 'EXTRA INNING ' + inning;
-    target.textContent = 'BULL';
+    target.textContent = t === 25 ? 'BULL' : String(t);
     sub.textContent = 'SUDDEN DEATH';
   } else if (t === 25) {
     kicker.textContent = 'FINAL INNING';
@@ -651,7 +659,10 @@ function beginTurn() {
       setTimeout(() => {
         if (!gameActive) return;
         flashInning();
-        if (inning > REG_INNINGS) speakIf('Sudden death. Bull.');
+        if (inning > REG_INNINGS) {
+          speakIf(targetForInning(inning) === 25 ? 'Sudden death. Bull.'
+                                                 : `Sudden death. Number ${targetForInning(inning)}.`);
+        }
         else if (isBullInning(inning)) speakIf('Final inning. Bull.');
         else speakIf(`Inning ${inning}`);
       }, delay);
@@ -675,6 +686,12 @@ function advanceTurn() {
       // Level after the bull inning — extra innings, sudden death
       sfxIf(sfxSD);
       showBroadcastEvent('dead', 'ALL SQUARE', 'EXTRA INNINGS', 'Bull — first to lead wins', 2200);
+    } else if (inning === REG_INNINGS + SD_BULL_INNINGS + 1) {
+      // The bull has failed to separate them — switch to a target they can hit
+      sfxIf(sfxSD);
+      showBroadcastEvent('dead', 'STILL LEVEL', 'SWITCH TO ' + SD_FALLBACK_TARGET,
+                         'Extra innings now on the ' + SD_FALLBACK_TARGET, 2400);
+      speakIf(`Still level. Switching to the ${SD_FALLBACK_TARGET}.`, true);
     }
   }
   currentPlayer = next;

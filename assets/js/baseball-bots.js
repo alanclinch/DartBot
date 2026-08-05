@@ -42,18 +42,41 @@ const CPU_PLAYERS = [
 // ── BOT TIERS ────────────────────────────────────────────────
 // Per-CPU sigma values (aim scatter, mm) for games that opt in via
 // generateCpuThrow's sigmaOverride. Baseball reads this for difficulty.
-// These are copied from cricket-bots.js as the starting point; retune freely for
-// Baseball — this file is isolated, so changes here affect Baseball ONLY.
+// This file is isolated — changes here affect Baseball ONLY, never Cricket.
+//
+// CALIBRATED 2026-08-05. The inherited values were Cricket's, never derived
+// from anything Baseball measures, so bots badly overperformed their rating in
+// the band people actually play: Bristow (rated 1.2) played 1.52, Wright
+// (rated 1.4) played 2.06, Taylor (rated 2.4) played 3.66.
+//
+// A Cricket *mark* and a Baseball *run* are the same unit (both the multiplier
+// on target; both score bull outer 1 / inner 2), so MPR and runs-per-inning are
+// directly comparable. Sigma is now binary-searched so each bot's RPI over the
+// nine NUMBER innings lands on **85% of its Cricket MPR**.
+//
+// Why 85% and not 100%: Cricket is played on 15-20 and the bull — the beds
+// humans practise. Baseball is played on 1-9, which nobody practises. The bot
+// is a physics sim with no such bias, equally accurate at the 3 as at the 20,
+// so a human scores below their own Cricket rating here while the bot would hit
+// it exactly. Matching MPR 1:1 therefore plays *harder* than the same-named
+// Cricket bot. The 15% discount absorbs that. Revisit once there is real match
+// data — the game records RPI per player.
+//
+// The bull inning is deliberately NOT calibrated; it stays genuinely hard, so
+// inning 10 is a real event.
+//
+// To re-derive: scratchpad harness binary-searches sigma against
+// generateCpuThrow, 9 number targets, ~24k throws per evaluation.
 const BOT_TIERS = {
-  cpu0: { sigma: 85 }, // Jocky Wilson
-  cpu1: { sigma: 55 }, // John Lowe
-  cpu2: { sigma: 38 }, // Eric Bristow
-  cpu3: { sigma: 26 }, // Peter Wright
-  cpu4: { sigma: 18 }, // Gary Anderson
-  cpu5: { sigma: 13 }, // Luke Littler
-  cpu6: { sigma:  9 }, // Luke Humphries
-  cpu7: { sigma:  7 }, // Michael van Gerwen
-  cpu8: { sigma:  5 }, // Phil Taylor
+  cpu0: { sigma: 109 }, // Jocky Wilson       — 0.43 RPI (rated 0.5)
+  cpu1: { sigma:  72 }, // John Lowe          — 0.75 RPI (rated 0.9)
+  cpu2: { sigma:  56 }, // Eric Bristow       — 1.02 RPI (rated 1.2)
+  cpu3: { sigma:  49 }, // Peter Wright       — 1.19 RPI (rated 1.4)
+  cpu4: { sigma:  43 }, // Gary Anderson      — 1.36 RPI (rated 1.6)
+  cpu5: { sigma:  38 }, // Luke Littler       — 1.52 RPI (rated 1.8)
+  cpu6: { sigma:  34 }, // Luke Humphries     — 1.69 RPI (rated 2.0)
+  cpu7: { sigma:  30 }, // Michael van Gerwen — 1.88 RPI (rated 2.2)
+  cpu8: { sigma:  27 }, // Phil Taylor        — 2.05 RPI (rated 2.4)
 };
 
 // ── FACE SVG GENERATOR ───────────────────────────────────────

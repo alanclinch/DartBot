@@ -5,6 +5,31 @@ COPY RESULTS. Bump `DARTBOT_VERSION` in `assets/js/cricket.js` and the
 `#version-badge` text in `games/cricket.html` together, and add an entry here.
 (Placeholder 3-digit scheme `vNNN` for now — will revisit later.)
 
+## Baseball: bot calibration + sudden-death fallback — 2026-08-05
+(No Cricket change — `baseball-bots.js` is an isolated fork; Cricket's file is untouched.)
+
+**Bots recalibrated.** The inherited sigmas were Cricket's, never derived from anything Baseball
+measures, so bots badly overperformed their rating in the band people actually play — Bristow
+(rated 1.2) played 1.52, Wright (rated 1.4) played 2.06, Taylor (rated 2.4) played 3.66.
+A Cricket *mark* and a Baseball *run* are the same unit, so MPR and runs-per-inning are directly
+comparable. Sigma is now binary-searched so each bot's RPI over the nine number innings lands on
+**85% of its Cricket MPR**: `109 · 72 · 56 · 49 · 43 · 38 · 34 · 30 · 27`.
+- **Why 85%, not 100%:** Cricket is played on 15–20 and the bull — the beds humans practise.
+  Baseball is played on 1–9, which nobody does. The bot is a physics sim with no such bias, so
+  matching MPR 1:1 would play *harder* than the same-named Cricket bot. The discount absorbs that.
+  Revisit with real match data — the game records RPI per player.
+- The bull inning is deliberately left uncalibrated, so inning 10 stays a real event.
+- Typical 10-inning totals now: Wilson 4.6 · Lowe 6.6 · Bristow 9.4 · Wright 10.8 · Anderson 12.6
+  (was 5.6 · 9.5 · 14.0 · 19.1 · 24.2).
+
+**Sudden death no longer stalls.** Extra innings 11–13 stay on the Bull as specified, but weak
+players score ~0 there, so two of them could trade zeros indefinitely — a simulation reached
+inning 26. If still level after inning 13, extra innings switch to the **20**, the bed everyone can
+actually hit. Full innings throughout; only the target changes, and the switch is announced on
+screen and by the caller. Deepest simulated game is now inning 18.
+
+baseball-bots.js v2, baseball.js v3.
+
 ## New game: Baseball — 2026-08-05
 (No Cricket version change — no Cricket file was touched.) Built to the spec in
 `handover/baseball.md`. New `games/baseball.html`, `assets/js/baseball.js`,
