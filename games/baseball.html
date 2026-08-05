@@ -10,7 +10,7 @@
 <script src="../assets/js/autodarts.js?v=3"></script>
 <script src="../assets/js/utils.js?v=4"></script>
 <script src="../assets/js/baseball-bots.js?v=1"></script>
-<link rel="stylesheet" href="../assets/css/baseball.css?v=1">
+<link rel="stylesheet" href="../assets/css/baseball.css?v=2">
 </head>
 <body>
 
@@ -21,12 +21,24 @@
   <div class="setup-card">
     <h3>How It Plays</h3>
     <div class="bb-rules">
-      <div><b>10 innings</b><span>Innings 1–9 target that number. Inning 10 is the Bull.</span></div>
-      <div><b>3 darts</b><span>Each player throws three darts per inning at that target.</span></div>
-      <div><b>Runs</b><span>Single = 1, double = 2, treble = 3. Max 9 in an inning.</span></div>
-      <div><b>Bull inning</b><span>Outer bull = 1 run, inner bull = 2. Max 6.</span></div>
-      <div><b>Winner</b><span>Most runs after 10 innings takes the ball game.</span></div>
-      <div><b>Level?</b><span>Extra Bull innings — sudden death until someone leads.</span></div>
+      <div class="bb-rule-line">
+        <span class="bb-rule-tag">FORMAT</span>
+        <span><b>10 innings, 3 darts each.</b> Innings 1–9 target that number — inning 10 targets the <b>Bull</b>.</span>
+      </div>
+
+      <div class="bb-runs-table">
+        <div class="bb-run-col"><span>SINGLE</span><strong>1</strong></div>
+        <div class="bb-run-col"><span>DOUBLE</span><strong>2</strong></div>
+        <div class="bb-run-col"><span>TREBLE</span><strong>3</strong></div>
+        <div class="bb-run-col bull"><span>OUTER BULL</span><strong>1</strong></div>
+        <div class="bb-run-col bull"><span>INNER BULL</span><strong>2</strong></div>
+      </div>
+      <div class="bb-rule-note">Runs score only on that inning's target — anything else counts nothing. Max 9 an inning, 6 in the Bull inning.</div>
+
+      <div class="bb-rule-line">
+        <span class="bb-rule-tag">WINNING</span>
+        <span><b>Most runs after 10 innings</b> takes the ball game. Level? Extra Bull innings, sudden death, until someone leads.</span>
+      </div>
     </div>
   </div>
 
@@ -37,7 +49,7 @@
       <button class="add-btn" id="add-human-btn" onclick="openHumanModal()">+ Human Player</button>
       <button class="add-btn" id="add-cpu-btn" onclick="openCpuModal()">+ Computer Player</button>
     </div>
-    <div id="roster-hint">Add 2 more players — Baseball is 2-player only.</div>
+    <div id="roster-hint">Add 2 players — Baseball is 2-player only.</div>
     <div id="recent-players" class="recent-players"></div>
   </div>
 
@@ -272,6 +284,6 @@
   <div class="be-main" id="be-main"></div>
   <div class="be-sub" id="be-sub"></div>
 </div>
-<script src="../assets/js/baseball.js?v=1"></script>
+<script src="../assets/js/baseball.js?v=2"></script>
 </body>
 </html>

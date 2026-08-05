@@ -254,7 +254,9 @@ function updateStartButton() {
   if (hint) {
     hint.textContent = players.length === MAX_PLAYERS
       ? 'Roster set — play ball!'
-      : `Add ${MAX_PLAYERS - players.length} more player${MAX_PLAYERS - players.length === 1 ? '' : 's'} — Baseball is 2-player only.`;
+      : (players.length === 0
+          ? 'Add 2 players — Baseball is 2-player only.'
+          : 'Add 1 more player to start.');
   }
   ['add-human-btn', 'add-cpu-btn', 'add-human-btn-w', 'add-cpu-btn-w'].forEach(id => {
     const b = document.getElementById(id);
