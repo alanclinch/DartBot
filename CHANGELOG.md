@@ -5,6 +5,31 @@ COPY RESULTS. Bump `DARTBOT_VERSION` in `assets/js/cricket.js` and the
 `#version-badge` text in `games/cricket.html` together, and add an entry here.
 (Placeholder 3-digit scheme `vNNN` for now — will revisit later.)
 
+## Baseball: batter vs fielder duel — 2026-08-05
+(No Cricket change.) Second rework in a day, and this one came from the owner: the pitcher/outs
+version still felt like an abstraction. Now it is a direct dart-for-dart duel.
+
+**Ruleset.** 5 innings. A **random number** is drawn per inning (no repeats) and both players face
+it. Innings 1-4: the **batter** throws 3 darts (single 1, double 2, **treble 3 = HOME RUN**), then
+the **fielder** throws 3 answering **dart for dart** — their 1st answers the batter's 1st, and so
+on. Only **that number's double** catches, and only the matching dart. **Inning 5 is the Bull
+finale** — no fielding at all, outer bull 2, inner bull 4.
+
+**Why dart-for-dart is load-bearing:** the fielder cannot pick off the batter's best dart, they get
+one attempt at each in order. A "cancel their best" rule removes ~35% of runs and two even players
+cancel each other to nothing.
+
+**Bots now field properly.** A second tangential dial (`defSigma`) plus `aimROverride` at the double
+ring. Two dials were needed because the binding constraint when hunting a double is being on the
+right *number* — at 166mm a wedge is only ±26mm wide, so even perfect radial aim left a mid bot at
+12%. The ladder is pinned to real players: casual pub ~5-10% of doubles, club ~15-20%, professional
+~40%. Bristow lands at 12%, Taylor at 34%. Only the additive opts hooks are used; no physics maths
+changed, and `baseball-bots.js` is isolated so Cricket cannot be touched.
+
+**Measured over 200 games:** mean final score 4.9 runs (median 4), extra innings in 16/200.
+
+baseball.js v5, baseball.css v7, baseball-bots.js v3.
+
 ## Baseball reworked: pitcher vs batter — 2026-08-05
 (No Cricket change.) The game was **parallel solitaire** — both players threw at the same target,
 scored independently, and nothing either did affected the other. It was Around the Clock Score

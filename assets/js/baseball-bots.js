@@ -67,16 +67,27 @@ const CPU_PLAYERS = [
 //
 // To re-derive: scratchpad harness binary-searches sigma against
 // generateCpuThrow, 9 number targets, ~24k throws per evaluation.
+//
+// `defSigma` is a SECOND, tighter tangential sigma used only when the bot is
+// FIELDING, where it aims at the double ring (aimROverride 166) and only that
+// number's double catches anything. Two dials are needed because the binding
+// constraint when hunting a double is being on the right *number* — at 166mm a
+// wedge is only ±26mm wide, so even perfect radial aim leaves a mid bot hitting
+// the double just 12% of the time. defSigma is solved so each bot's double rate
+// sits near a real player of that standard: casual pub ~5-10%, club ~15-20%,
+// professional ~40%. Uses only the additive opts hooks — no physics math changed.
+const DEF_SIGMA_R = 5;    // radial precision when aiming at the 8mm double band
+const DEF_AIM_R   = 166;  // centre of the 162-170mm double ring
 const BOT_TIERS = {
-  cpu0: { sigma: 109 }, // Jocky Wilson       — 0.43 RPI (rated 0.5)
-  cpu1: { sigma:  72 }, // John Lowe          — 0.75 RPI (rated 0.9)
-  cpu2: { sigma:  56 }, // Eric Bristow       — 1.02 RPI (rated 1.2)
-  cpu3: { sigma:  49 }, // Peter Wright       — 1.19 RPI (rated 1.4)
-  cpu4: { sigma:  43 }, // Gary Anderson      — 1.36 RPI (rated 1.6)
-  cpu5: { sigma:  38 }, // Luke Littler       — 1.52 RPI (rated 1.8)
-  cpu6: { sigma:  34 }, // Luke Humphries     — 1.69 RPI (rated 2.0)
-  cpu7: { sigma:  30 }, // Michael van Gerwen — 1.88 RPI (rated 2.2)
-  cpu8: { sigma:  27 }, // Phil Taylor        — 2.05 RPI (rated 2.4)
+  cpu0: { sigma: 109, defSigma: 72 }, // Jocky Wilson       — 0.43 RPI ·  6% doubles
+  cpu1: { sigma:  72, defSigma: 52 }, // John Lowe          — 0.75 RPI ·  9% doubles
+  cpu2: { sigma:  56, defSigma: 43 }, // Eric Bristow       — 1.02 RPI · 12% doubles
+  cpu3: { sigma:  49, defSigma: 37 }, // Peter Wright       — 1.19 RPI · 15% doubles
+  cpu4: { sigma:  43, defSigma: 31 }, // Gary Anderson      — 1.36 RPI · 18% doubles
+  cpu5: { sigma:  38, defSigma: 28 }, // Luke Littler       — 1.52 RPI · 20% doubles
+  cpu6: { sigma:  34, defSigma: 23 }, // Luke Humphries     — 1.69 RPI · 26% doubles
+  cpu7: { sigma:  30, defSigma: 20 }, // Michael van Gerwen — 1.88 RPI · 29% doubles
+  cpu8: { sigma:  27, defSigma: 17 }, // Phil Taylor        — 2.05 RPI · 34% doubles
 };
 
 // ── FACE SVG GENERATOR ───────────────────────────────────────
