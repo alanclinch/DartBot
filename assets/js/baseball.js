@@ -1,12 +1,26 @@
 // =============================================
-// Baseball — 9 innings + a Bull inning, most runs wins
+// Baseball — 5 innings, pitcher vs batter
 //
-// Ruleset:
-//   Innings 1–9 target the number N. Inning 10 targets the Bull.
-//   Each player throws 3 darts per inning at that inning's target.
-//   Runs: single = 1, double = 2, triple = 3 (max 9 per inning).
-//   Bull inning: outer bull = 1, inner bull = 2 (max 6).
-//   Level after inning 10 → extra Bull innings until someone leads.
+// Ruleset ("Pressure Baseball"):
+//   5 innings. Targets: inning 1→1, 2→2, 3→3, 4→4, 5→Bull.
+//   Every inning has a TOP half (P1 bats) and a BOTTOM half (P2 bats),
+//   so both players face every target — the halves make it fair.
+//
+//   Each half is a duel:
+//     1. The DEFENCE pitches first — 3 darts at the inning's target.
+//        Outs = the multiplier hit (single 1, double 2, treble 3),
+//        capped at 3. Bull inning: outer 1, inner 2.
+//     2. Three outs = SIDE RETIRED. The batter does not throw at all.
+//     3. Otherwise the BATTER throws 3 darts and keeps the BEST
+//        (3 − outs) of them. Single 1, double 2, treble 3 runs.
+//
+//   Defence attacks the batter's OPPORTUNITY, never their score. That is
+//   deliberate: a symmetric "defence cancels runs" rule is arithmetically
+//   fatal — two equally weak players cancel each other to ~0 runs a game.
+//   Shrinking the at-bat instead keeps scores in a realistic 4-6 range.
+//
+//   Level after 5 → extra innings on the Bull (also top and bottom),
+//   falling back to the 20 if the Bull cannot separate them.
 //
 // 2-player only, and themed as a broadcast HUD from the start — there is
 // no "stock" mode to preserve, so nothing here is gated behind an
@@ -18,8 +32,9 @@
 // cancelSpeech, sfx*, spawnConfetti — utils.js
 // =============================================
 
-const INNING_TARGETS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 25]; // inning 1..10
-const REG_INNINGS = 10;   // innings 11+ are sudden death
+const INNING_TARGETS = [1, 2, 3, 4, 25];  // inning 1..5 — the 5th is the Bull
+const REG_INNINGS = 5;    // innings 6+ are sudden death
+const MAX_OUTS = 3;
 // Sudden death repeats the Bull, but weak players score ~0 there, so two of them
 // can trade zeros for a very long time (a simulation reached inning 26). After
 // three tied Bull extras, fall back to the 20 — the bed everyone can actually
@@ -32,7 +47,10 @@ const MIN_PLAYERS = 2;
 const LS_KEY = 'dartbot_baseball_players';
 
 // Plural number words for the "HIT THE FOURS" sub-line
-const PLURAL_WORDS = ['', 'ONES', 'TWOS', 'THREES', 'FOURS', 'FIVES', 'SIXES', 'SEVENS', 'EIGHTS', 'NINES'];
+const PLURAL_WORDS = ['', 'ONES', 'TWOS', 'THREES', 'FOURS', 'FIVES', 'SIXES', 'SEVENS', 'EIGHTS', 'NINES',
+  'TENS', 'ELEVENS', 'TWELVES', 'THIRTEENS', 'FOURTEENS', 'FIFTEENS', 'SIXTEENS', 'SEVENTEENS',
+  'EIGHTEENS', 'NINETEENS', 'TWENTIES'];
+const ORDINALS = ['', '1ST', '2ND', '3RD', '4TH', '5TH', '6TH', '7TH', '8TH', '9TH', '10TH'];
 
 // =============================================
 // STATE
@@ -41,6 +59,9 @@ let players = [];
 let currentPlayer = 0;
 let currentDarts = [];
 let inning = 1;
+let half = 0;             // 0 = top (P1 bats), 1 = bottom (P2 bats)
+let phase = 'pitch';      // 'pitch' (defence) then 'bat' (offence)
+let outs = 0;             // outs recorded against the batter this half
 let gameActive = false;
 let winnerIdx = -1;
 let stateHistory = [];
@@ -57,7 +78,6 @@ let cpuTurnTimer = null;
 let turnEnded = false;
 let legNumber = 0;
 let startingPlayer = 0;
-let inningFirstPlayer = 0;
 let lastSpokenInning = 0;
 let firstTurnSpoken = false;
 let gameSession = null; // { playerKeys, wins: {name: count} }
@@ -138,6 +158,22 @@ function escapeHTML(s) {
 function targetForInning(n) {
   if (n <= REG_INNINGS) return INNING_TARGETS[n - 1];
   return (n <= REG_INNINGS + SD_BULL_INNINGS) ? 25 : SD_FALLBACK_TARGET;
+}
+// Top half: P1 bats and P2 pitches. Bottom half: the reverse.
+function batterIdx()  { return half; }
+function pitcherIdx() { return 1 - half; }
+function isPitching() { return phase === 'pitch'; }
+function dartsThatCount() { return MAX_OUTS - outs; }
+
+// An out is worth the multiplier hit, same scale as a run — a treble is a
+// wicket-taking delivery. Capped so a visit can never exceed 3 outs.
+function outsFor(seg, target) { return runsFor(seg, target); }
+
+// The batter keeps only their best (3 − outs) darts, so a treble thrown last
+// still counts. Recomputed live as the visit progresses.
+function keptRuns(dartRuns, allowed) {
+  return dartRuns.slice().sort((a, b) => b - a).slice(0, Math.max(0, allowed))
+    .reduce((a, b) => a + b, 0);
 }
 function isBullInning(n) { return targetForInning(n) === 25; }
 
@@ -420,11 +456,13 @@ function launchLeg() {
     p.hits = 0;
     p.dartsThrown = 0;
   });
-  currentPlayer = startingPlayer;
-  inningFirstPlayer = currentPlayer;
-  startingPlayer = (startingPlayer + 1) % players.length;
   currentDarts = [];
   inning = 1;
+  half = 0;
+  phase = 'pitch';
+  outs = 0;
+  currentPlayer = pitcherIdx();
+  startingPlayer = (startingPlayer + 1) % players.length;
   winnerIdx = -1;
   gameActive = true;
   turnEnded = false;
@@ -464,7 +502,7 @@ function buildBoard() {
         </div>
         <div class="bb-team-stats">
           <div><span>RPI</span><strong id="bb-rpi-${i}">—</strong></div>
-          <div><span>THIS INN</span><strong id="bb-inn-${i}">0</strong></div>
+          <div><span id="bb-inn-label-${i}">THIS INN</span><strong id="bb-inn-${i}">0</strong></div>
           <div><span>DARTS</span><strong id="bb-darts-${i}">0</strong></div>
         </div>
       </div>`;
@@ -485,7 +523,12 @@ function updateTeams(animateIdx = -1) {
   players.forEach((p, i) => {
     const tile = document.getElementById('bb-team-' + i);
     if (!tile) return;
-    tile.classList.toggle('on-throw', i === currentPlayer && winnerIdx < 0 && gameActive);
+    const live = winnerIdx < 0 && gameActive;
+    tile.classList.toggle('on-throw', live && i === currentPlayer);
+    tile.dataset.role = (live && i === currentPlayer)
+      ? (isPitching() ? 'PITCHING' : 'BATTING') : '';
+    tile.classList.toggle('at-bat',   live && i === batterIdx());
+    tile.classList.toggle('on-mound', live && i === pitcherIdx());
     tile.classList.toggle('leading', winnerIdx < 0 && players.length === 2 && p.runs > players[1 - i].runs);
     const runsEl = document.getElementById('bb-runs-' + i);
     if (runsEl) {
@@ -499,7 +542,15 @@ function updateTeams(animateIdx = -1) {
     const rpiEl = document.getElementById('bb-rpi-' + i);
     if (rpiEl) rpiEl.textContent = rpiOf(p);
     const innEl = document.getElementById('bb-inn-' + i);
-    if (innEl) innEl.textContent = String(inningRunsOf(p, inning) || 0);
+    if (innEl) {
+      innEl.textContent = (winnerIdx < 0 && gameActive && i === pitcherIdx())
+        ? outs + ' OUT'
+        : String(inningRunsOf(p, inning) || 0);
+    }
+    const innLabel = document.getElementById('bb-inn-label-' + i);
+    if (innLabel) {
+      innLabel.textContent = (winnerIdx < 0 && gameActive && i === pitcherIdx()) ? 'OUTS' : 'THIS INN';
+    }
     const dartsEl = document.getElementById('bb-darts-' + i);
     if (dartsEl) dartsEl.textContent = String(p.dartsThrown);
   });
@@ -533,7 +584,7 @@ function renderLineScore() {
       else cls.push('scored');
       cells.push(`<td class="${cls.join(' ')}">${v === undefined ? '·' : v}</td>`);
     }
-    const onThrow = i === currentPlayer && winnerIdx < 0 && gameActive;
+    const onThrow = i === batterIdx() && winnerIdx < 0 && gameActive;
     return `<tr class="bb-ls-row bb-ls-p${i}${onThrow ? ' now' : ''}">
       <th class="bb-ls-name">${escapeHTML(p.name)}</th>
       ${cells.join('')}
@@ -556,22 +607,36 @@ function updateHero() {
   if (!kicker || !target || !sub) return;
   const t = targetForInning(inning);
   const hero = document.getElementById('bb-hero');
-  if (hero) hero.classList.toggle('bull-inning', t === 25);
-
-  if (inning > REG_INNINGS) {
-    kicker.textContent = 'EXTRA INNING ' + inning;
-    target.textContent = t === 25 ? 'BULL' : String(t);
-    sub.textContent = 'SUDDEN DEATH';
-  } else if (t === 25) {
-    kicker.textContent = 'FINAL INNING';
-    target.textContent = 'BULL';
-    sub.textContent = 'OUTER 1 · INNER 2';
-  } else {
-    kicker.textContent = 'INNING ' + inning;
-    target.textContent = String(t);
-    sub.textContent = 'HIT THE ' + (PLURAL_WORDS[t] || t);
+  if (hero) {
+    hero.classList.toggle('bull-inning', t === 25);
+    hero.classList.toggle('pitching', isPitching());
   }
+
+  const halfLabel = (half === 0 ? 'TOP ' : 'BOT ') +
+    (inning <= 10 ? ORDINALS[inning] : inning + 'TH');
+  kicker.textContent = inning > REG_INNINGS ? 'EXTRA · ' + halfLabel : halfLabel;
+  target.textContent = t === 25 ? 'BULL' : String(t);
   target.classList.toggle('is-bull', t === 25);
+
+  if (isPitching()) {
+    sub.textContent = 'PITCHING — HITS MAKE OUTS';
+  } else if (outs > 0) {
+    sub.textContent = `BATTING — BEST ${dartsThatCount()} OF 3 COUNTS`;
+  } else {
+    sub.textContent = 'BATTING — ALL 3 DARTS COUNT';
+  }
+
+  // Out lamps
+  const lamps = document.getElementById('bb-outs');
+  if (lamps) {
+    lamps.innerHTML = [0, 1, 2].map(i =>
+      `<span class="bb-out${i < outs ? ' lit' : ''}"></span>`).join('');
+  }
+  const roleEl = document.getElementById('bb-role');
+  if (roleEl) {
+    roleEl.textContent = isPitching() ? 'PITCHING' : 'BATTING';
+    roleEl.className = 'bb-role ' + (isPitching() ? 'is-pitch' : 'is-bat');
+  }
 }
 
 function updateTurnDisplay() {
@@ -583,7 +648,11 @@ function updateTurnDisplay() {
     nameEl.textContent = p.name;
     nameEl.classList.toggle('cpu-turn', !!p.isCpu);
   }
-  if (subEl) subEl.textContent = p.isCpu ? 'Computer thinking…' : 'Throw your darts';
+  if (subEl) {
+    const role = isPitching() ? 'Pitching — hits make outs'
+                              : `Batting — best ${dartsThatCount()} of 3 counts`;
+    subEl.textContent = p.isCpu ? 'Computer thinking…' : role;
+  }
 }
 
 function updateInningBadge() {
@@ -594,7 +663,7 @@ function updateInningBadge() {
   const side = document.getElementById('inning-num');
   if (side) side.textContent = String(inning);
   const sideSub = document.getElementById('inning-sub');
-  if (sideSub) sideSub.textContent = inning > REG_INNINGS ? 'EXTRA' : 'INNING';
+  if (sideSub) sideSub.textContent = (half === 0 ? 'TOP' : 'BOTTOM');
   const tv = document.getElementById('target-val');
   if (tv) {
     const t = targetForInning(inning);
@@ -621,12 +690,14 @@ function resetDartSlots() {
     slot.innerHTML = `<div class="bb-hd-val">—</div><div class="bb-hd-runs"></div>`;
   }
 }
-function fillDartSlot(i, label, type, runs) {
+function fillDartSlot(i, label, type, runs, outsGot) {
   const slot = document.getElementById('bb-hd' + i);
   if (!slot) return;
   slot.className = 'bb-hd ' + (type || '');
+  const tag = outsGot > 0 ? (outsGot === 1 ? 'OUT' : outsGot + ' OUTS')
+                          : (runs > 0 ? '+' + runs : '');
   slot.innerHTML = `<div class="bb-hd-val">${escapeHTML(label)}</div>` +
-    `<div class="bb-hd-runs">${runs > 0 ? '+' + runs : ''}</div>`;
+    `<div class="bb-hd-runs">${tag}</div>`;
 }
 
 // =============================================
@@ -634,11 +705,13 @@ function fillDartSlot(i, label, type, runs) {
 // =============================================
 function beginTurn() {
   if (winnerIdx >= 0) return;
+  currentPlayer = isPitching() ? pitcherIdx() : batterIdx();
   const p = players[currentPlayer];
   if (!p) return;
 
-  // Open this player's inning box so the line score shows a live 0 rather than a dot
-  if (p.inningRuns[inning - 1] === undefined) p.inningRuns[inning - 1] = 0;
+  // Open the batter's inning box so the line score shows a live 0, not a dot
+  const b = players[batterIdx()];
+  if (b.inningRuns[inning - 1] === undefined) b.inningRuns[inning - 1] = 0;
 
   currentDarts = [];
   turnEnded = false;
@@ -653,48 +726,84 @@ function beginTurn() {
       speakIf(`${p.name}, you're up first`);
       nameDelay = 1800;
     }
-    if (inning > lastSpokenInning) {
+    // Announce the inning once, at the top of it
+    if (inning > lastSpokenInning && half === 0 && isPitching()) {
       lastSpokenInning = inning;
       const delay = nameDelay > 0 ? nameDelay : 500;
-      setTimeout(() => {
+      inningFlashTimer = setTimeout(() => {
         if (!gameActive) return;
         flashInning();
-        if (inning > REG_INNINGS) {
-          speakIf(targetForInning(inning) === 25 ? 'Sudden death. Bull.'
-                                                 : `Sudden death. Number ${targetForInning(inning)}.`);
-        }
-        else if (isBullInning(inning)) speakIf('Final inning. Bull.');
+        const t = targetForInning(inning);
+        if (inning > REG_INNINGS) speakIf(t === 25 ? 'Extra innings. Bull.' : `Extra innings. Number ${t}.`);
+        else if (t === 25) speakIf('Final inning. Bull.');
         else speakIf(`Inning ${inning}`);
       }, delay);
+    } else if (!isPitching() && outs > 0) {
+      speakIf(outs === 1 ? 'One out.' : 'Two outs.');
     }
   }
 
   if (p.isCpu) cpuTurnTimer = setTimeout(runCpuTurn, 1300);
 }
 
+// Called when a visit is over. Moves pitch -> bat, or bat -> next half.
 function advanceTurn() {
   if (winnerIdx >= 0 || !gameActive) return;
-  if (cpuTurnTimer) { clearTimeout(cpuTurnTimer); cpuTurnTimer = null; }
-  if (missTimer) { clearTimeout(missTimer); missTimer = null; }
+  clearTurnTimers();
 
-  const next = (currentPlayer + 1) % players.length;
-  if (next === inningFirstPlayer) {
-    // Both players have completed this inning
-    if (inning >= REG_INNINGS && !isTied()) { endMatch(); return; }
-    inning++;
-    if (inning === REG_INNINGS + 1) {
-      // Level after the bull inning — extra innings, sudden death
-      sfxIf(sfxSD);
-      showBroadcastEvent('dead', 'ALL SQUARE', 'EXTRA INNINGS', 'Bull — first to lead wins', 2200);
-    } else if (inning === REG_INNINGS + SD_BULL_INNINGS + 1) {
-      // The bull has failed to separate them — switch to a target they can hit
-      sfxIf(sfxSD);
-      showBroadcastEvent('dead', 'STILL LEVEL', 'SWITCH TO ' + SD_FALLBACK_TARGET,
-                         'Extra innings now on the ' + SD_FALLBACK_TARGET, 2400);
-      speakIf(`Still level. Switching to the ${SD_FALLBACK_TARGET}.`, true);
+  if (isPitching()) {
+    if (outs >= MAX_OUTS) {           // side retired — the batter never throws
+      bankInning(0);
+      return;
     }
+    phase = 'bat';
+    sfxIf(sfxNext);
+    beginTurn();
+    return;
   }
-  currentPlayer = next;
+
+  // Batting visit finished — bank the best (3 - outs) darts
+  bankInning(keptRuns(currentDarts.map(d => d.runs), dartsThatCount()));
+}
+
+// Commit the batter's runs for this half, then move the game on.
+function bankInning(runs) {
+  const b = players[batterIdx()];
+  const prev = b.inningRuns[inning - 1] || 0;
+  b.runs += runs - prev;              // the box was live-updated during the visit
+  b.inningRuns[inning - 1] = runs;
+
+  const maxRuns = maxRunsForInning(inning);
+  if (runs > 0 && runs === maxRuns) {
+    if (isBullInning(inning)) {
+      showBroadcastEvent('score', 'PERFECT INNING', '6 RUNS', playerCallName(b), 2200);
+      speakIf(`Perfect inning! Six runs for ${playerCallName(b)}!`, true);
+    } else {
+      showBroadcastEvent('score', 'GRAND SLAM', '9 RUNS', playerCallName(b), 2400);
+      speakIf(`Grand slam! Nine runs for ${playerCallName(b)}!`, true);
+    }
+    sfxIf(sfxCheckout);
+  }
+
+  if (half === 0) {                   // top done -> play the bottom
+    half = 1; phase = 'pitch'; outs = 0;
+    sfxIf(sfxNext);
+    beginTurn();
+    return;
+  }
+
+  // Inning complete
+  if (inning >= REG_INNINGS && !isTied()) { endMatch(); return; }
+  inning++; half = 0; phase = 'pitch'; outs = 0;
+  if (inning === REG_INNINGS + 1) {
+    sfxIf(sfxSD);
+    showBroadcastEvent('dead', 'ALL SQUARE', 'EXTRA INNINGS', 'Bull — first to lead wins', 2200);
+  } else if (inning === REG_INNINGS + SD_BULL_INNINGS + 1) {
+    sfxIf(sfxSD);
+    showBroadcastEvent('dead', 'STILL LEVEL', 'SWITCH TO ' + SD_FALLBACK_TARGET,
+                       'Extra innings now on the ' + SD_FALLBACK_TARGET, 2400);
+    speakIf(`Still level. Switching to the ${SD_FALLBACK_TARGET}.`, true);
+  }
   sfxIf(sfxNext);
   beginTurn();
 }
@@ -721,23 +830,54 @@ function registerDart(seg) {
   saveState();
 
   const tgt = targetForInning(inning);
-  const runs = runsFor(seg, tgt);
   // utils.js isMiss() matches 'M1'/'M2'… but NOT the bare {name:'M'} this repo
   // constructs for a manual/padded miss, so it would render as a neutral 'M'
   // instead of a red MISS. Any dart with no number is a miss, so check that too.
   const isM = isMiss(seg) || !Number(seg && seg.number);
   const label = isM ? 'MISS' : (seg.name || dartSpeak(seg));
-  const type = isM ? 'miss' : (runs > 0 ? 'scored' : 'hit');
-
   p.dartsThrown++;
-  if (runs > 0) {
-    p.runs += runs;
-    p.inningRuns[inning - 1] = (p.inningRuns[inning - 1] || 0) + runs;
-    p.hits++;
+
+  if (isPitching()) {
+    // ── DEFENCE: every hit on the target records outs ──
+    const got = Math.min(outsFor(seg, tgt), MAX_OUTS - outs);
+    outs += got;
+    currentDarts.push({ seg, label, type: got > 0 ? 'out' : (isM ? 'miss' : 'hit'), runs: 0, outs: got });
+    fillDartSlot(currentDarts.length - 1, label, got > 0 ? 'out' : (isM ? 'miss' : 'hit'), 0, got);
+    if (got > 0) {
+      sfxIf(() => sfxForHit(seg));
+      flash(got === 1 ? 'OUT!' : got + ' OUTS!', 'var(--bb-red)');
+    } else {
+      sfxIf(sfxMiss);
+    }
+    updateTeams();
+    renderLineScore();
+    updateHero();
+
+    if (outs >= MAX_OUTS) {
+      turnEnded = true;
+      showBroadcastEvent('close', 'SIDE RETIRED', 'THREE OUTS', playerCallName(p), 2000);
+      speakIf(`Three outs! ${playerCallName(p)} retires the side.`, true);
+      cpuTurnTimer = setTimeout(advanceTurn, 2000);
+      return;
+    }
+    if (currentDarts.length >= 3) { endOfTurn(p); return; }
+    if (p.isCpu) cpuTurnTimer = setTimeout(runCpuTurn, 1100);
+    return;
   }
 
-  currentDarts.push({ seg, label, type, runs });
-  fillDartSlot(currentDarts.length - 1, label, type, runs);
+  // ── OFFENCE: score runs, but only the best (3 - outs) darts survive ──
+  const runs = runsFor(seg, tgt);
+  const type = isM ? 'miss' : (runs > 0 ? 'scored' : 'hit');
+  currentDarts.push({ seg, label, type, runs, outs: 0 });
+  fillDartSlot(currentDarts.length - 1, label, type, runs, 0);
+  markCountingDarts();
+
+  // Keep the batter's inning box live as they throw
+  const b = players[batterIdx()];
+  const live = keptRuns(currentDarts.map(d => d.runs), dartsThatCount());
+  const prev = b.inningRuns[inning - 1] || 0;
+  b.runs += live - prev;
+  b.inningRuns[inning - 1] = live;
 
   if (runs > 0) {
     sfxIf(() => sfxForHit(seg));
@@ -745,15 +885,28 @@ function registerDart(seg) {
   } else {
     sfxIf(sfxMiss);
   }
-
-  updateTeams(runs > 0 ? currentPlayer : -1);
+  updateTeams(runs > 0 ? batterIdx() : -1);
   renderLineScore();
+  updateHero();
 
-  if (currentDarts.length >= 3) {
-    endOfTurn(p);
-  } else if (p.isCpu) {
-    cpuTurnTimer = setTimeout(runCpuTurn, 1100);
-  }
+  if (currentDarts.length >= 3) { endOfTurn(p); return; }
+  if (p.isCpu) cpuTurnTimer = setTimeout(runCpuTurn, 1100);
+}
+
+// Dim the batter's darts that will be discarded, so "best 3 - outs" is visible
+// as it happens rather than being sprung on them at the end of the visit.
+function markCountingDarts() {
+  if (isPitching()) return;
+  const allowed = dartsThatCount();
+  const order = currentDarts
+    .map((d, i) => ({ i, runs: d.runs }))
+    .sort((a, b) => b.runs - a.runs)
+    .slice(0, allowed)
+    .map(x => x.i);
+  currentDarts.forEach((d, i) => {
+    const el = document.getElementById('bb-hd' + i);
+    if (el) el.classList.toggle('discarded', !order.includes(i));
+  });
 }
 
 function announceRun(seg, runs, tgt) {
@@ -770,26 +923,16 @@ function announceRun(seg, runs, tgt) {
 
 function endOfTurn(p) {
   turnEnded = true;
-  const total = p.inningRuns[inning - 1] || 0;
-  const maxRuns = maxRunsForInning(inning);
-
-  // Flourish for a maxed-out inning. No bonus runs — celebration only.
-  if (total === maxRuns) {
-    if (isBullInning(inning)) {
-      showBroadcastEvent('score', 'PERFECT INNING', '6 RUNS', playerCallName(p), 2200);
-      speakIf(`Perfect inning! Six runs for ${playerCallName(p)}!`, true);
-    } else {
-      showBroadcastEvent('score', 'GRAND SLAM', '9 RUNS', playerCallName(p), 2400);
-      speakIf(`Grand slam! Nine runs for ${playerCallName(p)}!`, true);
-    }
-    sfxIf(sfxCheckout);
-  } else {
+  if (!isPitching()) {
+    const total = keptRuns(currentDarts.map(d => d.runs), dartsThatCount());
     speakIf(`${playerCallName(p)}, ${total === 0 ? 'no runs' : (total === 1 ? 'one run' : total + ' runs')}`);
+  } else if (outs === 0) {
+    speakIf('No outs.');
   }
 
-  // The final turn of a decided match ends the game itself — no NEXT PLAYER click.
-  const isLastOfInning = (currentPlayer + 1) % players.length === inningFirstPlayer;
-  const matchDecided = inning >= REG_INNINGS && isLastOfInning && !isTied();
+  // The last batting visit of a decided match ends the game — no NEXT click.
+  const matchDecided = !isPitching() && half === 1 && inning >= REG_INNINGS
+    && players[0].runs !== players[1].runs;
 
   if (matchDecided) {
     cpuTurnTimer = setTimeout(advanceTurn, p.isCpu ? 1100 : 900);
@@ -863,7 +1006,7 @@ function saveState() {
     })),
     currentPlayer,
     currentDarts: currentDarts.slice(),
-    inning,
+    inning, half, phase, outs,
     turnEnded,
   });
 }
@@ -882,11 +1025,15 @@ function undoLastDart() {
   currentPlayer = last.currentPlayer;
   currentDarts = last.currentDarts;
   inning = last.inning;
+  half = last.half;
+  phase = last.phase;
+  outs = last.outs;
   turnEnded = last.turnEnded;
   clearAllTimers();
   updateAll();
   resetDartSlots();
-  currentDarts.forEach((d, idx) => fillDartSlot(idx, d.label, d.type, d.runs));
+  currentDarts.forEach((d, idx) => fillDartSlot(idx, d.label, d.type, d.runs, d.outs));
+  markCountingDarts();
   document.getElementById('next-player-btn').style.display =
     (turnEnded && !players[currentPlayer].isCpu) ? '' : 'none';
 }

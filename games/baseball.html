@@ -10,7 +10,7 @@
 <script src="../assets/js/autodarts.js?v=3"></script>
 <script src="../assets/js/utils.js?v=4"></script>
 <script src="../assets/js/baseball-bots.js?v=2"></script>
-<link rel="stylesheet" href="../assets/css/baseball.css?v=5">
+<link rel="stylesheet" href="../assets/css/baseball.css?v=6">
 </head>
 <body>
 
@@ -21,10 +21,10 @@
   <div class="setup-card">
     <h3>How It Plays</h3>
     <ol class="bb-rules">
-      <li><span class="bb-rule-n">1</span><span><b>Innings 1–9</b> target that number. <b>Inning 10</b> targets the <b>Bull</b>.</span></li>
-      <li><span class="bb-rule-n">2</span><span>Each player throws <b>3 darts</b> at that target.</span></li>
-      <li><span class="bb-rule-n">3</span><span><b>Single 1</b> · <b>Double 2</b> · <b>Treble 3</b> — on the Bull, <b>outer 1</b> · <b>inner 2</b></span></li>
-      <li><span class="bb-rule-n">4</span><span>Off target scores <b>0</b>. <b>Most runs after 10 innings wins.</b></span></li>
+      <li><span class="bb-rule-n">1</span><span><b>5 innings.</b> Targets are <b>1, 2, 3, 4</b> then the <b>Bull</b>. You both bat every inning.</span></li>
+      <li><span class="bb-rule-n">2</span><span>The <b>pitcher</b> throws first. Every hit on the target is an <b>out</b> — treble = 3 outs.</span></li>
+      <li><span class="bb-rule-n">3</span><span><b>3 outs and the batter doesn't throw.</b> Otherwise they keep their <b>best 3 − outs</b> darts.</span></li>
+      <li><span class="bb-rule-n">4</span><span>Runs: <b>single 1</b> · <b>double 2</b> · <b>treble 3</b>. <b>Most runs after 5 innings wins.</b></span></li>
     </ol>
   </div>
 
@@ -103,7 +103,7 @@
       <div class="bb-match-strip">
         <div class="bb-match-cell">INNING<br><strong id="bb-inning-top">1</strong></div>
         <div class="bb-match-title">BASEBALL</div>
-        <div class="bb-match-cell">FORMAT<br><strong id="bb-inning-of">OF 10</strong></div>
+        <div class="bb-match-cell">FORMAT<br><strong id="bb-inning-of">OF 5</strong></div>
       </div>
       <div class="bb-topbar-right">
         <div id="bb-leg-badge" class="bb-leg-badge" style="display:none;"></div>
@@ -114,9 +114,13 @@
       <div class="bb-team-slot" id="bb-team-slot-0"></div>
 
       <div id="bb-hero">
-        <div class="bb-hero-kicker" id="bb-hero-kicker">INNING 1</div>
+        <div class="bb-hero-kicker" id="bb-hero-kicker">TOP 1ST</div>
+        <div class="bb-role is-pitch" id="bb-role">PITCHING</div>
         <div class="bb-hero-target" id="bb-hero-target">1</div>
-        <div class="bb-hero-sub" id="bb-hero-sub">HIT THE ONES</div>
+        <div class="bb-hero-sub" id="bb-hero-sub">PITCHING — HITS MAKE OUTS</div>
+        <div class="bb-outs-row"><span class="bb-outs-label">OUTS</span>
+          <span id="bb-outs"><span class="bb-out"></span><span class="bb-out"></span><span class="bb-out"></span></span>
+        </div>
         <div class="bb-hero-darts">
           <div class="bb-hd" id="bb-hd0"><div class="bb-hd-val">—</div><div class="bb-hd-runs"></div></div>
           <div class="bb-hd" id="bb-hd1"><div class="bb-hd-val">—</div><div class="bb-hd-runs"></div></div>
@@ -270,6 +274,6 @@
   <div class="be-main" id="be-main"></div>
   <div class="be-sub" id="be-sub"></div>
 </div>
-<script src="../assets/js/baseball.js?v=3"></script>
+<script src="../assets/js/baseball.js?v=4"></script>
 </body>
 </html>

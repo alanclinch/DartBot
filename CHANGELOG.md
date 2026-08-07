@@ -5,6 +5,37 @@ COPY RESULTS. Bump `DARTBOT_VERSION` in `assets/js/cricket.js` and the
 `#version-badge` text in `games/cricket.html` together, and add an entry here.
 (Placeholder 3-digit scheme `vNNN` for now — will revisit later.)
 
+## Baseball reworked: pitcher vs batter — 2026-08-05
+(No Cricket change.) The game was **parallel solitaire** — both players threw at the same target,
+scored independently, and nothing either did affected the other. It was Around the Clock Score
+Attack in a baseball hat. Rebuilt as a contest.
+
+**New ruleset.** 5 innings, targets 1, 2, 3, 4, Bull. Every inning has a TOP half (P1 bats) and a
+BOTTOM half (P2 bats), so both players face every target. Each half:
+1. The **defence pitches first** — 3 darts at the inning's target. Outs = the multiplier hit
+   (single 1, double 2, treble 3), capped at 3. Bull inning: outer 1, inner 2.
+2. **Three outs = SIDE RETIRED** and the batter does not throw at all.
+3. Otherwise the **batter throws 3 darts and keeps the BEST (3 − outs)** of them — so a treble
+   thrown last still counts.
+
+**Why defence attacks opportunity, not score.** The obvious design is "defence cancels runs", and
+it is arithmetically fatal: two equally weak players (35% hit rate, ~1.3 average multiplier) score
+~1.4 runs an inning and cancel ~1.35, so every game lands on 0-0. Shrinking the at-bat instead
+keeps scoring alive while making defence matter.
+
+**Top-and-bottom halves fix a fairness hole** in the original 5-then-switch idea: whoever batted the
+back half would have faced the Bull while the other player never did — worth ~0.8 runs of a game
+decided by ~4.
+
+**Measured over 200 simulated games:** mean final score **4.4 runs** (median 4, range 0-16) — the
+old game produced 10-20, which was basketball. 50% of half-innings are scoreless (real MLB is ~72%).
+Extra innings in 17/200, deepest inning 10. The bot ladder still holds: Wright beats Lowe 4.2-2.4.
+
+UI: role badge on the active player's own name bar, three out lamps, and the batter's discarded
+darts are dimmed and struck through live so "best 3 − outs" is visible as it happens.
+
+baseball.js v4, baseball.css v6.
+
 ## Baseball: bot calibration + sudden-death fallback — 2026-08-05
 (No Cricket change — `baseball-bots.js` is an isolated fork; Cricket's file is untouched.)
 

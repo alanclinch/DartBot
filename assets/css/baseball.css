@@ -148,14 +148,26 @@
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 #bb-team-slot-1 .bb-team-label { text-align: right; }
+/* The active card names the ROLE, so "who" and "what they're doing" are one
+   glance instead of two — the centre badge alone meant looking twice. */
+/* NOTE: attr() reads only from the element the pseudo-element belongs to, so
+   attr(data-role) here would look at .bb-team-name (which has no such attr)
+   and render an empty pill. The value comes from the ancestor, so the content
+   has to be spelled out per state below. */
 .bb-team.on-throw .bb-team-name::after {
-  content: "ON THROW";
+  content: "";
   flex: none;
-  background: var(--bb-ink); color: var(--bb-amber);
-  font: 900 14px/1 'Exo 2', sans-serif; letter-spacing: 2px;
-  padding: 8px 14px 7px; border-radius: 999px;
+  background: var(--bb-ink); color: #fff;
+  font: 900 15px/1 'Exo 2', sans-serif; letter-spacing: 2px;
+  padding: 9px 16px 8px; border-radius: 999px;
+  white-space: nowrap;
 }
-#bb-team-slot-1 .bb-team.on-throw .bb-team-name::after { color: var(--bb-blue); }
+.bb-team.on-throw[data-role="PITCHING"] .bb-team-name::after {
+  content: "PITCHING"; background: var(--bb-red); color: #fff;
+}
+.bb-team.on-throw[data-role="BATTING"] .bb-team-name::after {
+  content: "BATTING"; background: #0d3b1e; color: var(--bb-green);
+}
 
 .bb-team-body {
   display: flex; flex-direction: column;
@@ -203,7 +215,7 @@
 #bb-hero {
   display: flex; flex-direction: column;
   align-items: center; justify-content: center;
-  gap: 6px; min-height: 0;
+  gap: 4px; min-height: 0;
   border: 1px solid var(--bb-line);
   border-radius: 14px;
   background: var(--bb-panel);
@@ -217,7 +229,7 @@
 #bb-hero.bull-inning .bb-hero-kicker { background: var(--bb-amber); }
 .bb-hero-target {
   font-family: 'Exo 2', sans-serif; font-weight: 900;
-  font-size: clamp(110px, 12vw, 210px);
+  font-size: clamp(90px, 9.5vw, 165px);
   line-height: .88; letter-spacing: -4px;
   color: #fff;
 }
@@ -231,6 +243,55 @@
   letter-spacing: 4px; color: var(--bb-dim);
   text-align: center;
 }
+
+/* ── ROLE + OUTS ─────────────────────────────────────────── */
+/* The whole game now hinges on which role you are in, so it has to be the
+   loudest thing in the middle column after the target itself. */
+.bb-role {
+  font: 900 15px 'Exo 2', sans-serif;
+  letter-spacing: 5px;
+  padding: 6px 18px 5px;
+  border-radius: 999px;
+  margin-top: 8px;
+}
+.bb-role.is-pitch { background: var(--bb-red);   color: #fff; }
+.bb-role.is-bat   { background: var(--bb-green); color: var(--bb-ink); }
+
+.bb-outs-row {
+  display: flex; align-items: center; gap: 10px;
+  margin-top: 10px;
+}
+.bb-outs-label {
+  font: 800 12px 'Exo 2', sans-serif;
+  letter-spacing: 3px; color: var(--bb-dim);
+}
+#bb-outs { display: flex; gap: 7px; }
+.bb-out {
+  width: 18px; height: 18px; border-radius: 50%;
+  border: 2px solid rgba(255,255,255,.35);
+  background: transparent;
+  transition: background .18s, box-shadow .18s;
+}
+.bb-out.lit {
+  background: var(--bb-red);
+  border-color: var(--bb-red);
+  box-shadow: 0 0 14px rgba(255,70,85,.65);
+}
+/* Pitching tints the hero so you can tell the phase from across the room */
+#bb-hero.pitching { border-color: rgba(255,70,85,.45); }
+
+/* Team panels: who is at bat vs on the mound */
+.bb-team.at-bat   { filter: none; }
+.bb-team.on-mound:not(.on-throw) { filter: brightness(.82) saturate(.75); }
+
+
+/* A batter's dart that will be discarded (outside their best 3 - outs) */
+.bb-hd.discarded { opacity: .32; }
+.bb-hd.discarded .bb-hd-runs { text-decoration: line-through; }
+
+/* A pitcher's dart that recorded outs */
+.bb-hd.out { background: var(--bb-red); border-color: var(--bb-red); }
+.bb-hd.out .bb-hd-val, .bb-hd.out .bb-hd-runs { color: #fff; }
 
 /* 3-dart strip lives on the board (glance-able from the oche), not the
    operator side panel. */
