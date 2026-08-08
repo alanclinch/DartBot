@@ -28,7 +28,19 @@ changed, and `baseball-bots.js` is isolated so Cricket cannot be touched.
 
 **Measured over 200 games:** mean final score 4.9 runs (median 4), extra innings in 16/200.
 
-baseball.js v5, baseball.css v7, baseball-bots.js v3.
+**Fielding presentation, after a Codex review.** Its finding: the rules were sound but the
+mechanic would feel invisible at the oche. Three fixes:
+- **"NO PLAY"** on any dart the batter failed to score with. Asking someone to field a dart that
+  cannot be caught is theatre — "I'm throwing because the app told me to, but success is
+  impossible" is what would have killed it.
+- **The dart being answered now** carries a pulsing white outline and "FIELD THIS", so dart-for-dart
+  order is unmistakable at 3-4m.
+- **The fielder's actual dart is always shown** ("D17 — no catch"), so a bot's catch is never an
+  opaque event that reads as cheating.
+- A caught home run now gets a 2.6s takeover, confetti and its own caller line; a caught single gets
+  a short sting. Catching a treble should feel completely different from catching a single.
+
+baseball.js v6, baseball.css v8, baseball-bots.js v3.
 
 ## Baseball reworked: pitcher vs batter — 2026-08-05
 (No Cricket change.) The game was **parallel solitaire** — both players threw at the same target,

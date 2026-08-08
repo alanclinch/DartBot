@@ -711,9 +711,19 @@ function renderDartSlots() {
         val = b.label;
         tag = b.runs > 0 ? '+' + b.runs : '';
         cls += ' ' + b.type + (b.cancelled ? ' caught' : '');
+        // Nothing to catch on a dart that never scored — say so, rather than
+        // asking someone to throw at a target that cannot possibly matter.
+        if (b.runs === 0) cls += ' noplay';
       }
       const mine = currentDarts[i];
-      if (mine) ans = mine.cancelled ? '✔ CAUGHT' : mine.label;
+      if (mine) {
+        // Always show the fielder's actual dart, so a bot's catch is never an
+        // opaque event — "D17 caught" vs "S17 no catch" keeps it honest.
+        ans = mine.cancelled ? '✔ CAUGHT' : (b && b.runs === 0 ? 'NO PLAY' : mine.label + ' — no catch');
+      } else if (i === currentDarts.length) {
+        cls += ' answering';                  // the dart being answered right now
+        ans = (b && b.runs === 0) ? 'NO PLAY' : 'FIELD THIS';
+      }
     }
     slot.className = cls;
     slot.innerHTML = `<div class="bb-hd-val">${escapeHTML(val)}</div>` +
@@ -862,9 +872,16 @@ function registerDart(seg) {
     if (hit && answered && !answered.cancelled && answered.runs > 0) {
       answered.cancelled = true;
       sfxIf(sfxCheckout);
-      showBroadcastEvent('close', answered.runs === 3 ? 'CAUGHT THE HOMER' : 'OUT!',
-                         'D' + tgt, `-${answered.runs} · ${playerCallName(p)}`, 1700);
-      speakIf(answered.runs === 3 ? 'Caught the home run!' : 'Out!', true);
+      if (answered.runs === 3) {
+        showBroadcastEvent('close', 'CAUGHT THE HOME RUN', 'D' + tgt,
+                           `${playerCallName(p)} robs him of 3`, 2600);
+        speakIf('He has caught the home run!', true);
+        if (typeof spawnConfetti === 'function' && !testMode) spawnConfetti();
+      } else {
+        showBroadcastEvent('close', 'CAUGHT', 'D' + tgt,
+                           `-${answered.runs} · ${playerCallName(p)}`, 1500);
+        speakIf('Caught!', true);
+      }
     } else if (hit) {
       sfxIf(sfxDouble);
       flash('D' + tgt + ' — NOTHING TO CATCH', 'var(--bb-dim)');

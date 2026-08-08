@@ -350,6 +350,24 @@
 }
 .bb-hd.caught .bb-hd-ans { color: var(--bb-red); text-decoration: none; }
 
+/* The dart the fielder is answering RIGHT NOW. This has to be unmistakable at
+   3-4m or the whole dart-for-dart mechanic is invisible. */
+.bb-hd.answering {
+  outline: 3px solid #fff;
+  outline-offset: 3px;
+  animation: bbAnswering 1.1s ease-in-out infinite;
+}
+@keyframes bbAnswering {
+  0%, 100% { outline-color: rgba(255,255,255,.95); }
+  50%      { outline-color: rgba(255,255,255,.35); }
+}
+.bb-hd.answering .bb-hd-ans { color: #fff; }
+
+/* A batter dart that scored nothing — the fielder cannot affect it */
+.bb-hd.noplay { opacity: .38; }
+.bb-hd.noplay.answering { opacity: .6; outline-color: rgba(255,255,255,.4); animation: none; }
+.bb-hd.noplay .bb-hd-ans { color: var(--bb-dim); }
+
 /* ── LINE SCORE (the centrepiece) ─────────────────────────── */
 #bb-linescore {
   border: 1px solid var(--bb-line);
