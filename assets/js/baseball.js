@@ -623,8 +623,12 @@ function updateHero() {
 
   kicker.textContent = inning > REG_INNINGS ? 'EXTRA INNING ' + inning
                      : finale ? 'BULL FINALE' : 'INNING ' + inning + ' OF ' + REG_INNINGS;
-  target.textContent = t === 25 ? 'BULL' : String(t);
+  // When fielding, only the DOUBLE counts — so show D15, never 15. Showing the
+  // bare number sent a player to throw at the right number for no reward.
+  const showD = !isBatting() && !finale;
+  target.textContent = t === 25 ? 'BULL' : (showD ? 'D' + t : String(t));
   target.classList.toggle('is-bull', t === 25);
+  target.classList.toggle('is-double', showD);
 
   if (finale) sub.textContent = 'SHOOTOUT — OUTER 2 · INNER 4';
   else if (isBatting()) sub.textContent = 'BATTING — S1 · D2 · T3 HOME RUN';
@@ -677,10 +681,13 @@ function updateInningBadge() {
   const sideSub = document.getElementById('inning-sub');
   if (sideSub) sideSub.textContent = (half === 0 ? 'TOP' : 'BOTTOM');
   const tv = document.getElementById('target-val');
+  const tl = document.getElementById('target-label');
   if (tv) {
     const t = targetForInning(inning);
-    tv.textContent = t === 25 ? 'BULL' : String(t);
+    const fielding = !isBatting() && !isBullFinale(inning);
+    tv.textContent = t === 25 ? 'BULL' : (fielding ? 'D' + t : String(t));
     tv.classList.toggle('bull', t === 25);
+    if (tl) tl.textContent = fielding ? 'CATCH WITH' : 'TARGET';
   }
 }
 
@@ -754,23 +761,21 @@ function beginTurn() {
   document.getElementById('next-player-btn').style.display = 'none';
 
   if (!testMode) {
-    let nameDelay = 0;
-    if (!firstTurnSpoken && !p.isCpu) {
-      firstTurnSpoken = true;
-      speakIf(`${p.name}, you're up first`);
-      nameDelay = 1800;
-    }
-    // Announce the drawn number once, when the inning opens
+    const t = targetForInning(inning);
+    // Announce the drawn number once, when the inning opens, then always say
+    // who is up and what they are doing.
     if (inning > lastSpokenInning && half === 0 && isBatting()) {
       lastSpokenInning = inning;
+      flashInning();
+      if (isBullFinale(inning)) speakIf('Bull finale! No fielding. Outer two, inner four.', true);
+      else speakIf(`Inning ${inning}. Number ${t}.`, true);
       inningFlashTimer = setTimeout(() => {
-        if (!gameActive) return;
-        flashInning();
-        const t = targetForInning(inning);
-        if (isBullFinale(inning)) speakIf('Bull finale! No fielding. Outer two, inner four.', true);
-        else speakIf(`Inning ${inning}. Number ${t}.`);
-      }, nameDelay > 0 ? nameDelay : 500);
+        if (gameActive) speakIf(`${p.name} to bat`);
+      }, 2200);
+    } else {
+      speakIf(isBatting() ? `${p.name} to bat` : `${p.name} to field. Double ${t}.`, true);
     }
+    firstTurnSpoken = true;
   }
 
   if (p.isCpu) cpuTurnTimer = setTimeout(runCpuTurn, 1300);
@@ -782,6 +787,13 @@ function advanceTurn() {
   clearTurnTimers();
 
   if (isBatting() && hasFielding(inning)) {
+    // Nothing scored means nothing to catch — don't make anyone throw three
+    // darts at a target that cannot change the score.
+    if (liveInningRuns() === 0) {
+      flash('NO RUNS — NO FIELDING', 'var(--bb-dim)');
+      bankInning();
+      return;
+    }
     phase = 'defend';
     sfxIf(sfxNext);
     beginTurn();
@@ -885,6 +897,11 @@ function registerDart(seg) {
     } else if (hit) {
       sfxIf(sfxDouble);
       flash('D' + tgt + ' — NOTHING TO CATCH', 'var(--bb-dim)');
+    } else if (Number(seg && seg.number) === tgt) {
+      // On the number but not the double: a near miss, not a miss. Playing the
+      // miss sound here made a good dart feel like a bad one.
+      sfxIf(sfxHit);
+      flash('NO CATCH — NEEDS D' + tgt, 'var(--bb-dim)');
     } else {
       sfxIf(sfxMiss);
     }

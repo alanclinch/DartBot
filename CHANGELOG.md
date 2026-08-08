@@ -5,6 +5,22 @@ COPY RESULTS. Bump `DARTBOT_VERSION` in `assets/js/cricket.js` and the
 `#version-badge` text in `games/cricket.html` together, and add an entry here.
 (Placeholder 3-digit scheme `vNNN` for now — will revisit later.)
 
+## Baseball: fixes from the first human-vs-human game — 2026-08-08
+Owner played it. "A mess." Four fixes, all from real play rather than simulation.
+
+- **The screen was telling fielders to throw at the wrong thing.** The target readouts showed the
+  bare number (`TARGET 15`) in both roles, but when fielding **only D15 does anything** — so you
+  threw at what the screen said, hit it, and got nothing plus a miss sound. Both readouts now show
+  **D15** while fielding, and the side-panel label changes from TARGET to **CATCH WITH**.
+- **A fielder hitting the number is no longer treated as a miss.** It plays a hit sound and flashes
+  "NO CATCH — NEEDS D15". It was a good dart being told it was a bad one.
+- **No runs on the board = no fielding visit.** A scoreless batting visit now goes straight to the
+  other player. Nobody should throw three darts at a target that cannot change the score.
+- **The caller now says who is up and what they are doing** — "Alan to bat", "Dave to field, double
+  15" — on every visit, not just the first.
+
+baseball.js v7, baseball.css v9.
+
 ## Baseball: batter vs fielder duel — 2026-08-05
 (No Cricket change.) Second rework in a day, and this one came from the owner: the pitcher/outs
 version still felt like an abstraction. Now it is a direct dart-for-dart duel.

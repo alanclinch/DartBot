@@ -239,6 +239,7 @@
   line-height: .88; letter-spacing: -4px;
   color: #fff;
 }
+.bb-hero-target.is-double { color: var(--bb-red); font-size: clamp(70px, 7.5vw, 130px); }
 .bb-hero-target.is-bull {
   font-size: clamp(64px, 7vw, 120px);
   letter-spacing: 2px;
