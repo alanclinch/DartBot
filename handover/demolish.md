@@ -6,7 +6,7 @@ control; looks are tested on a laptop emulating 1080p). The forward focus for De
 that section matters.
 
 Files: `games/Demolish.html`, `assets/js/demolish.js`, `assets/css/demolish.css`.
-Assets are cache-busted (`demolish.js?v=6`, `demolish.css?v=3`; shared libs aligned to Cricket's versions).
+Assets are cache-busted (`demolish.js?v=7`, `demolish.css?v=3`; shared libs aligned to Cricket's versions).
 
 **What it is:** an **X01-style** game (start at a score, subtract each dart, **check out to exactly 0**;
 last player left standing loses) dressed as a **"demolish the gem tower"** theme — each player's score

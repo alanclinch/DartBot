@@ -2605,7 +2605,11 @@ document.addEventListener('keydown',e=>{
     // A few air-mouse receivers move DOM focus back to the page while their
     // physical keyboard remains active. Recover that first character instead
     // of passing it to Demolish's scoring shortcuts.
-    if(!targetIsField && ae!==nameInput && !e.ctrlKey && !e.metaKey && !e.altKey){
+    // Trust the event target rather than activeElement here. The board's Rii
+    // receiver can report the input as focused while dispatching its key event
+    // to document/body; in that state the browser has nowhere to insert the
+    // character unless we do it explicitly.
+    if(!targetIsField && !e.ctrlKey && !e.metaKey && !e.altKey){
       nameInput.focus({preventScroll:true});
       const start = nameInput.selectionStart ?? nameInput.value.length;
       const end = nameInput.selectionEnd ?? start;
