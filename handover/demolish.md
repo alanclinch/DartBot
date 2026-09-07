@@ -5,8 +5,8 @@ here — the **Target environment** section (1080p TV, viewed at distance, scree
 control; looks are tested on a laptop emulating 1080p). The forward focus for Demolish is visual, so
 that section matters.
 
-Files: `games/Demolish.html`, `assets/js/demolish.js` (~2.1k lines), `assets/css/demolish.css`.
-Assets are now cache-busted (`demolish.js?v=3`, shared libs aligned to Cricket's versions).
+Files: `games/Demolish.html`, `assets/js/demolish.js`, `assets/css/demolish.css`.
+Assets are cache-busted (`demolish.js?v=6`, `demolish.css?v=3`; shared libs aligned to Cricket's versions).
 
 **What it is:** an **X01-style** game (start at a score, subtract each dart, **check out to exactly 0**;
 last player left standing loses) dressed as a **"demolish the gem tower"** theme — each player's score
@@ -42,6 +42,14 @@ backdrop. CPU difficulty comes from **`BOT_TIERS[cpuId].sigma`** (via `generateC
   `bot_bible` memory.
 - **WS** — `handleWS` (same seenThrows / miss-debounce / takeout pattern as Cricket).
 - **Checkout hints** — `getCheckoutSuggestion` / `oneDartLabel` (suggests finishes).
+- **Optional 2v2** — `createLivePlayers` turns four roster entries into two shared-score teams.
+  Turns follow A1, B1, A2, B2; the current teammate may be human or CPU. Team games still save
+  darts, points, games, and wins against each individual member.
+- **Optional tournaments** — `beginTournament` / `normalizeTournament` / `renderTournament` create
+  and advance a single-elimination bracket. Events support 3–16 singles players or 2–8 two-player
+  teams, best-of-1/3/5 matches, automatic byes, optional shuffle, and local resume via
+  `dartbot_demolish_tournament_v1`. `recordTournamentLeg` and `reverseTournamentLeg` connect the
+  bracket to the winner and Back to Game flows.
 
 ## Invariants & gotchas
 - **PPR, not MPR.** Demolish reads `BOT_TIERS` sigma for difficulty and displays PPR. Don't surface
@@ -50,27 +58,28 @@ backdrop. CPU difficulty comes from **`BOT_TIERS[cpuId].sigma`** (via `generateC
   if you touch the win flow.
 - **Neon `x01_*` columns** keep Demolish stats separate from Cricket's — don't write into `marks`/`darts`.
 - Some styling is still **inline / duplicated** from `game.css` (legacy). `demolish.css` is otherwise
-  the game-screen styles. Not cache-versioned before this session (now `demolish.css?v=1`).
+  the game-screen styles and is currently cache-versioned as `demolish.css?v=3`.
 
 ## Validate before shipping
 - `node --check assets/js/demolish.js`.
+- `node tools/simulate-demolish-games.js roundrobin 80` after checkout or CPU targeting changes.
 - Play a leg vs a CPU on a laptop; for visual work use a **1920×1080** viewport (see CLAUDE.md testing
   tiers). Board-connected behaviour needs the TV PC (logs are hard there — lean on on-screen state).
+- For teams, verify the turn sequence A1, B1, A2, B2 and that each teammate's own stats are saved.
+- For tournaments, cover a bye bracket, a multi-leg match, Back to Game after a false checkout, and
+  resume after reload. Standard mode must remain selected by default.
 
 ---
 
 # ⭐ Next up
 
-## Watch item (unconfirmed — NOT a current blocker): add-human name field
-Owner reported once that the "+ Human Player" name field wouldn't accept typing — but on re-test it
-**works on a laptop and could not be reproduced there**, so it is **not a confirmed code bug**; most
-likely board/air-mouse-specific (focus not landing) or transient. **Action: re-test on the actual
-TV / air-mouse setup**, don't chase it on a laptop. If it recurs: the modal markup/CSS/JS matches
-Cricket's working version, so the first suspect is Demolish's global `keydown` handler being **ungated
-on game state** — Cricket's returns during setup (`if(!gameActive) return`); Demolish relies solely on
-an `inText` guard, so if the input isn't focused the keys get swallowed as game input. Harden by gating
-the keydown on `!gameActive`/setup and ensuring the input reliably focuses. The two items below are the
-real priorities.
+## Resolved 2026-09-07: air-mouse name field and party-readiness pass
+The physical Rii mini keyboard reproduced the add-human failure. The modal now focuses reliably,
+recovers the first character if the receiver moves DOM focus back to the page, and prevents game
+shortcuts while name entry is open. The same pass locked manual controls during CPU turns, aligned CPU
+checkout targeting with Straight Out, made Undo restore complete pre-dart state (including busts and
+bonuses), corrected PPR/Test Mode handling and bonus help text, and cleared the four-player header
+overlap. Re-test name entry once on the actual TV after deployment and a hard refresh.
 
 ## 1. Make it more fun, vibrant & better-looking
 The owner wants Demolish to feel punchier and look better. Two levers:

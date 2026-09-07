@@ -42,6 +42,7 @@ const GEM_PALETTES=[
   ['#20c0c0','#70f0f0','#008080'],
 ];
 const LS_KEY = 'dartbot_players';
+const TOURNAMENT_KEY = 'dartbot_demolish_tournament_v1';
 
 // ══ SETTINGS (Voice / SFX / Test Mode) ══
 let voiceEnabled = true;
@@ -581,12 +582,68 @@ let legNumber = 0;
 let gameSession = null;
 let lastResult = null;  // snapshot of the just-finished leg, so "Back to Game" can reverse a false win
 let throwLog = []; // raw WS throws captured for the debug modal
+let playMode = 'standard';
+let tournamentType = 'singles';
+let tournamentBestOf = 1;
+let isTeamMatch = false;
+let teamTurnOrder = [];
+let teamTurnCursor = 0;
+let tournamentState = null;
+let activeTournamentMatch = null;
 
 function getSessionKey() {
-  return setupPlayers.map(p => `${p.name}|${p.isCpu ? 1 : 0}`).join(',');
+  return `${isTeamMatch ? 'teams' : 'standard'}:` + setupPlayers.map(p => `${p.name}|${p.isCpu ? 1 : 0}`).join(',');
 }
 
 // ══ SETUP UI ══
+function rosterLimit() {
+  return playMode === 'tournament' ? 16 : 4;
+}
+
+function rosterIsValid() {
+  if (playMode === 'standard') return setupPlayers.length >= 2 && setupPlayers.length <= 4;
+  if (playMode === 'teams') return setupPlayers.length === 4;
+  if (tournamentType === 'teams') return setupPlayers.length >= 4 && setupPlayers.length <= 16 && setupPlayers.length % 2 === 0;
+  return setupPlayers.length >= 3 && setupPlayers.length <= 16;
+}
+
+function selectPlayMode(mode, btn) {
+  playMode = ['standard','teams','tournament'].includes(mode) ? mode : 'standard';
+  document.querySelectorAll('[data-mode]').forEach(el => el.classList.toggle('sel', el === btn || el.dataset.mode === playMode));
+  const descriptions = {
+    standard: 'Classic Demolish for 2–4 individual players.',
+    teams: 'Two shared towers. Teammates alternate visits in a 2v2 match.',
+    tournament: 'A saved single-elimination bracket for singles or 2v2 teams.',
+  };
+  document.getElementById('mode-desc').textContent = descriptions[playMode];
+  document.getElementById('tournament-options').style.display = playMode === 'tournament' ? '' : 'none';
+  renderPlayerList();
+  renderRecentPlayers();
+}
+
+function selectTournamentType(type, btn) {
+  tournamentType = type === 'teams' ? 'teams' : 'singles';
+  document.querySelectorAll('[data-tournament-type]').forEach(el => el.classList.toggle('sel', el === btn || el.dataset.tournamentType === tournamentType));
+  renderPlayerList();
+}
+
+function selectTournamentBestOf(bestOf, btn) {
+  tournamentBestOf = [1,3,5].includes(Number(bestOf)) ? Number(bestOf) : 1;
+  document.querySelectorAll('[data-best-of]').forEach(el => el.classList.toggle('sel', el === btn || Number(el.dataset.bestOf) === tournamentBestOf));
+}
+
+function beginSelectedMode() {
+  if (!rosterIsValid()) return;
+  if (playMode === 'tournament') {
+    beginTournament();
+    return;
+  }
+  tournamentState = null;
+  activeTournamentMatch = null;
+  isTeamMatch = playMode === 'teams';
+  newGame();
+}
+
 function adjScore(d){
   _scoreIdx = (_scoreIdx + d + SCORE_OPTIONS.length) % SCORE_OPTIONS.length;
   _score = SCORE_OPTIONS[_scoreIdx];
@@ -608,19 +665,24 @@ function buildCpuGrid() {
   }).join('');
 }
 
-function openCpuModal(){if(setupPlayers.length>=4)return;document.getElementById('cpu-modal').classList.add('open');}
+function openCpuModal(){if(setupPlayers.length>=rosterLimit())return;document.getElementById('cpu-modal').classList.add('open');}
 function closeCpuModal(){document.getElementById('cpu-modal').classList.remove('open');}
 function openHumanModal(){
-  if(setupPlayers.length>=4)return;
-  document.getElementById('new-human-name').value='';
+  if(setupPlayers.length>=rosterLimit())return;
+  const nameInput = document.getElementById('new-human-name');
+  nameInput.value='';
   document.getElementById('human-modal').classList.add('open');
-  setTimeout(()=>document.getElementById('new-human-name').focus(),100);
+  // Some air-mouse keyboards only send text to the control that was focused
+  // during the opening click. Focus now, then once more after the modal has
+  // been painted in case the device/browser drops the first request.
+  nameInput.focus({preventScroll:true});
+  requestAnimationFrame(()=>nameInput.focus({preventScroll:true}));
 }
 function closeHumanModal(){document.getElementById('human-modal').classList.remove('open');}
 
 function addCpuPlayer(id) {
   const cpu = CPU_PLAYERS.find(c => c.id === id);
-  if (!cpu || setupPlayers.length >= 4) return;
+  if (!cpu || setupPlayers.length >= rosterLimit()) return;
   const color = PLAYER_COLORS[setupPlayers.length % 6];
   setupPlayers.push({name:cpu.name, color, flag:cpu.flag, isCpu:true, cpuData:cpu});
   closeCpuModal();
@@ -635,7 +697,7 @@ function confirmAddHuman() {
 }
 
 function addHumanPlayer(name, flag) {
-  if (setupPlayers.length >= 4) return;
+  if (setupPlayers.length >= rosterLimit()) return;
   const color = PLAYER_COLORS[setupPlayers.length % 6];
   setupPlayers.push({name, color, flag, isCpu:false, cpuData:null});
   renderPlayerList();
@@ -662,7 +724,23 @@ function renderPlayerList() {
   if (el) el.innerHTML = html;
   const elW = document.getElementById('player-list-winner');
   if (elW) elW.innerHTML = html;
+  renderTeamPreview();
   checkStartBtn();
+}
+
+function renderTeamPreview() {
+  const el = document.getElementById('team-preview');
+  if (!el) return;
+  const show = playMode === 'teams' || (playMode === 'tournament' && tournamentType === 'teams');
+  el.style.display = show ? '' : 'none';
+  if (!show) { el.innerHTML = ''; return; }
+  const pairs = [];
+  for (let i = 0; i < setupPlayers.length; i += 2) pairs.push(setupPlayers.slice(i, i + 2));
+  el.innerHTML = '<div class="team-preview-label">TEAMS ARE PAIRED IN ROSTER ORDER</div>' + pairs.map((pair, i) => `
+    <div class="team-preview-row ${pair.length < 2 ? 'incomplete' : ''}">
+      <span>TEAM ${i + 1}</span>
+      <strong>${pair.map(p => escapeHTML(p.name)).join(' & ') || 'Waiting for players'}</strong>
+    </div>`).join('');
 }
 
 function renderRecentPlayers() {
@@ -691,7 +769,17 @@ document.addEventListener('click', e => {
 });
 
 function checkStartBtn() {
-  document.getElementById('start-btn').disabled = setupPlayers.length < 2;
+  const btn = document.getElementById('start-btn');
+  btn.disabled = !rosterIsValid();
+  btn.textContent = playMode === 'teams' ? 'START 2v2' : playMode === 'tournament' ? 'CREATE TOURNAMENT' : 'DEMOLISH!';
+  const countLabel = document.getElementById('player-count-label');
+  if (countLabel) {
+    countLabel.textContent = playMode === 'standard' ? '(2–4)'
+      : playMode === 'teams' ? '(exactly 4)'
+      : tournamentType === 'teams' ? '(4–16, even number)'
+      : '(3–16)';
+  }
+  document.querySelectorAll('.add-btn').forEach(addBtn => { addBtn.disabled = setupPlayers.length >= rosterLimit(); });
 }
 
 // ══ THROW LOG (debug) ══
@@ -710,6 +798,55 @@ function copyLog() {
 }
 
 // ══ GAME START ══
+function teamName(members) {
+  return members.map(member => firstName(member.name)).join(' & ');
+}
+
+function getActiveThrower(player = players[cp]) {
+  if (!player) return null;
+  return player.isTeam ? player.members[player.memberTurn || 0] : player;
+}
+
+function createLivePlayers() {
+  if (!isTeamMatch) {
+    return setupPlayers.map((p, i) => ({
+      ...p,
+      palette: GEM_PALETTES[i % 6],
+      score: startScore,
+      turnStart: startScore,
+      checkedOut: false,
+      gemsRemoved: 0,
+      totalDartsThrown: 0,
+      bonusCountdown: randBonusGap(),
+      pendingBonus: null,
+    }));
+  }
+
+  const teamRosters = [setupPlayers.slice(0, 2), setupPlayers.slice(2, 4)];
+  return teamRosters.map((members, i) => ({
+    id: `team-${i}`,
+    name: teamName(members),
+    color: PLAYER_COLORS[i],
+    flag: members[0].flag,
+    isTeam: true,
+    members: members.map(member => ({
+      ...member,
+      totalDartsThrown: 0,
+      totalPoints: 0,
+    })),
+    memberTurn: 0,
+    activeVisitPointsStart: 0,
+    palette: GEM_PALETTES[i],
+    score: startScore,
+    turnStart: startScore,
+    checkedOut: false,
+    gemsRemoved: 0,
+    totalDartsThrown: 0,
+    bonusCountdown: randBonusGap(),
+    pendingBonus: null,
+  }));
+}
+
 function newGame() {
   gameSession = null;
   legNumber = 0;
@@ -722,20 +859,27 @@ function startGame() {
   winLocked = false;
   lastResult = null;
   throwLog = [];
+  const winLabel = document.getElementById('win-label');
+  const nextLegBtn = document.getElementById('next-leg-btn');
+  if (winLabel) winLabel.textContent = 'CHECKED OUT FIRST!';
+  if (nextLegBtn) nextLegBtn.textContent = 'PLAY NEXT LEG';
   startScore = _score * _mult;
-  players = setupPlayers.map((p, i) => ({
-    ...p,
-    palette: GEM_PALETTES[i % 6],
-    score: startScore,
-    turnStart: startScore,
-    checkedOut: false,
-    gemsRemoved: 0,
-    totalDartsThrown: 0,
-    bonusCountdown: randBonusGap(),
-    pendingBonus: null,
-  }));
+  players = createLivePlayers();
   clearTurnTimers();
-  cp=startingPlayer; darts=[]; seenThrows=0; turnEnded=false; gameActive=true; sdActive=false; turnToken++;
+  if (isTeamMatch) {
+    teamTurnOrder = [
+      {teamIdx:0, memberIdx:0}, {teamIdx:1, memberIdx:0},
+      {teamIdx:0, memberIdx:1}, {teamIdx:1, memberIdx:1},
+    ];
+    teamTurnCursor = startingPlayer % teamTurnOrder.length;
+    const firstTurn = teamTurnOrder[teamTurnCursor];
+    cp = firstTurn.teamIdx;
+    players[cp].memberTurn = firstTurn.memberIdx;
+    players[cp].activeVisitPointsStart = getActiveThrower(players[cp]).totalPoints;
+  } else {
+    cp = startingPlayer;
+  }
+  darts=[]; seenThrows=0; turnEnded=false; gameActive=true; sdActive=false; turnToken++;
   checkedOut=[]; roundCheckedOut=[]; sdPlayers=[]; sdThrows={}; sdIdx=0; missTimer=null; activeBonus=null; bonusTimers=[];
   document.documentElement.requestFullscreen().catch(() => {});
   showScreen('game');
@@ -746,16 +890,21 @@ function startGame() {
   if(legBadge){if(legNumber>0){legBadge.textContent=`LEG ${legNumber+1}`;legBadge.style.display='';}else{legBadge.style.display='none';}}
   highlightActive();
   updatePanel();
-  callPlayerName(players[cp]);
+  callPlayerName(getActiveThrower(players[cp]));
   prepareBonusForNextDart(cp);
-  if (players[cp].isCpu) scheduleCpuTurn(players[cp], turnToken, 2000);
+  if (getActiveThrower(players[cp]).isCpu) scheduleCpuTurn(players[cp], turnToken, 2000);
 }
 
 // ══ TOWER SVG ══
 function buildTowers() {
   const area = document.getElementById('towers-area');
+  const playfield = document.getElementById('playfield');
   area.innerHTML = '';
   area.className = `towers-area players-${players.length}`;
+  if (playfield) {
+    playfield.classList.remove('players-1', 'players-2', 'players-3', 'players-4');
+    playfield.classList.add(`players-${players.length}`);
+  }
   players.forEach((p, i) => {
     const [c1,c2,c3] = p.palette;
     let rects = '';
@@ -809,6 +958,7 @@ function buildTowers() {
     wrap.innerHTML = `<div class="tower-head">
         <div class="tower-score" id="ts-${i}">${p.score}</div>
         <div class="tower-name">${escapeHTML(p.name)}</div>
+        ${p.isTeam ? `<div class="tower-team-members">${p.members.map(member => escapeHTML(member.name)).join(' · ')}</div>` : ''}
         <div class="tower-ppr" id="tppr-${i}">PPR —</div>
       </div>
       <div class="tower-svg-wrap" id="tsw-${i}">${svg}</div>
@@ -832,12 +982,30 @@ function parseSegScore(seg) {
 function registerDart(score, seg) {
   if (!gameActive || turnEnded || darts.length >= 3) return;
   const p = players[cp];
+  const thrower = getActiveThrower(p);
+  const undoState = {
+    players: players.map(player => ({
+      score: player.score,
+      turnStart: player.turnStart,
+      gemsRemoved: player.gemsRemoved,
+      totalDartsThrown: player.totalDartsThrown,
+      bonusCountdown: player.bonusCountdown,
+      pendingBonus: player.pendingBonus ? {...player.pendingBonus} : null,
+      members: player.isTeam ? player.members.map(member => ({
+        totalDartsThrown: member.totalDartsThrown,
+        totalPoints: member.totalPoints,
+      })) : null,
+    })),
+    activeBonus: activeBonus ? {...activeBonus} : null,
+  };
   p.totalDartsThrown++;
+  if (p.isTeam) thrower.totalDartsThrown++;
   const isMissed = (score === null || score === 0);
   const s = isMissed ? 0 : score;
   const display = isMissed ? 'Miss' : (seg && seg.name ? seg.name : dartSpeak(seg));
   const bonusToResolve = activeBonus && activeBonus.playerIdx === cp && activeBonus.dartIdx === darts.length ? activeBonus : null;
-  darts.push({score:s, display, isMissed});
+  const dartEntry = {score:s, display, isMissed, undoState};
+  darts.push(dartEntry);
   updateDartDisplay(s, display);
   if (isMissed) {
     playMiss();
@@ -850,17 +1018,22 @@ function registerDart(score, seg) {
   const newScore = p.turnStart - soFar;
   if (newScore < 0) {
     turnEnded=true; playBust();
+    if (p.isTeam) thrower.totalPoints = p.activeVisitPointsStart;
     resolveBonusAfterDart(bonusToResolve, seg, false);
     p.score = p.turnStart; showOverlay(cp,'bust'); updateScore(cp);
     updatePanel();
     setTimeout(() => restoreGems(cp), 350); return;
   }
+  if (p.isTeam) thrower.totalPoints += s;
   sfxLaser(s, seg ? Number(seg.multiplier || 1) : 1);
   const destroyedScore = startScore - newScore;
   const targetRemoved = Math.min(TOTAL_BLOCKS, Math.floor((destroyedScore / startScore) * TOTAL_BLOCKS));
   const checkoutIdx = cp; // capture before animation — cp can change if WS Takeout fires mid-animation
   if (newScore === 0) { turnEnded = true; gameActive = false; } // lock early so WS can't advance turn during animation
   removeGems(checkoutIdx, targetRemoved, () => {
+    // Undo can happen while the destruction animation is still settling.
+    // Do not let its delayed callback silently re-apply the removed dart.
+    if (!darts.includes(dartEntry) || players[checkoutIdx] !== p) return;
     p.score = newScore; updateScore(checkoutIdx);
     if (newScore === 0) { handleCheckout(checkoutIdx); return; }
     if (newScore <= 10) playWarn();
@@ -1096,9 +1269,8 @@ function svgPointToScreen(el, x, y) {
 }
 
 function getPlayerPPR(p) {
-  const rounds = Math.floor(p.totalDartsThrown / 3);
-  if (!rounds) return null;
-  return ((startScore - p.score) / rounds).toFixed(1);
+  if (!p.totalDartsThrown) return null;
+  return (((startScore - p.score) * 3) / p.totalDartsThrown).toFixed(1);
 }
 function updateScore(idx){
   const el=document.getElementById('ts-'+idx);if(el)el.textContent=players[idx].score;
@@ -1440,6 +1612,23 @@ function advanceTurn() {
   const rem=players.filter(p=>!p.checkedOut);
   if(!rem.length)return;
   if(rem.length===1&&players.length>1){setTimeout(()=>showWin(players[checkedOut[0]]),600);return;}
+  if (isTeamMatch) {
+    teamTurnCursor = (teamTurnCursor + 1) % teamTurnOrder.length;
+    const nextTurn = teamTurnOrder[teamTurnCursor];
+    cp = nextTurn.teamIdx;
+    players[cp].memberTurn = nextTurn.memberIdx;
+    players[cp].turnStart = players[cp].score;
+    players[cp].activeVisitPointsStart = getActiveThrower(players[cp]).totalPoints;
+    darts=[]; seenThrows=0; turnEnded=false;
+    [0,1,2].forEach(i=>{const s=document.getElementById('dc'+i);if(s){s.querySelector('.dart-slot-val').textContent='—';s.className='dart-slot';}});
+    document.getElementById('last-dart-val').textContent='—';
+    highlightActive(); updatePanel(); sfxNextLocal();
+    aimShipAtPlayer(cp);
+    callPlayerName(getActiveThrower(players[cp]));
+    prepareBonusForNextDart(cp);
+    if (getActiveThrower(players[cp]).isCpu) scheduleCpuTurn(players[cp], turnToken, 2000);
+    return;
+  }
   let next=(cp+1)%players.length,loops=0;
   while(players[next].checkedOut&&loops<players.length){next=(next+1)%players.length;loops++;}
   if(next<=cp){
@@ -1453,7 +1642,7 @@ function advanceTurn() {
   highlightActive(); updatePanel(); sfxNextLocal();
   aimShipAtPlayer(cp);
   prepareBonusForNextDart(cp);
-  if (players[cp].isCpu) scheduleCpuTurn(players[cp], turnToken, 2000);
+  if (getActiveThrower(players[cp]).isCpu) scheduleCpuTurn(players[cp], turnToken, 2000);
 }
 
 function highlightActive() {
@@ -1558,31 +1747,31 @@ function chooseDemolishTarget(player, dartInTurn) {
   if (activeBonus
       && activeBonus.playerIdx === cp
       && activeBonus.dartIdx === dartInTurn) {
-    const sigma = getDemolishSigma(player.cpuData.id);
+    const cpuPlayer = getActiveThrower(player);
+    const sigma = getDemolishSigma(cpuPlayer.cpuData.id);
     const accurateEnough = sigma <= 20; // 50 PPR and above
     if (accurateEnough) {
       const chase = () => ({ number: activeBonus.targetNumber, aimR: 134.5 });
       if (activeBonus.type === 'demolish') {
-        const worthBombing = players.some((opp, i) =>
-          i !== cp && !opp.checkedOut
-          && (TOTAL_BLOCKS - opp.gemsRemoved) / TOTAL_BLOCKS > 0.30);
+        const worthBombing = (TOTAL_BLOCKS - player.gemsRemoved) / TOTAL_BLOCKS > 0.30;
         if (worthBombing) return chase();
       } else if (activeBonus.type === 'heal') {
-        const ownDamage = player.gemsRemoved / TOTAL_BLOCKS;
-        if (ownDamage > 0.25) return chase();
+        const target = players[activeBonus.targetPlayerIdx];
+        const targetDamage = target ? target.gemsRemoved / TOTAL_BLOCKS : 0;
+        if (targetDamage > 0.25) return chase();
       }
     }
     // Ignore the bonus — fall through to default scoring.
   }
 
-  // 2) Checkout — if in range and a path exists, follow it. Each dart in
-  //    the path picks its own ring (treble for setup, double to finish).
-  if (player.score <= 170 && player.score >= 2) {
-    const path = getDemolishCheckout(player.score);
-    if (path) {
-      const t = checkoutDartTarget(path, dartInTurn);
-      if (t) return t;
-    }
+  // 2) Checkout — Demolish is exact-zero straight-out, so use the same
+  //    route shown to human players. Recalculate from the live score after
+  //    every dart and always aim at the first dart in the fresh route.
+  const checkout = getCheckoutSuggestion(player.score, Math.max(1, 3 - dartInTurn));
+  if (checkout) {
+    const firstDart = checkout.split(' + ')[0];
+    const t = checkoutDartTarget(firstDart, 0);
+    if (t) return t;
   }
 
   // 3) Sudden Death — bull is the best single-dart EV.
@@ -1594,7 +1783,8 @@ function chooseDemolishTarget(player, dartInTurn) {
 
 function runCpuTurn() {
   const p = players[cp];
-  if (!p || !p.isCpu || !gameActive || sdActive || cpuTurnRunning) return;
+  const cpuPlayer = getActiveThrower(p);
+  if (!p || !cpuPlayer || !cpuPlayer.isCpu || !gameActive || sdActive || cpuTurnRunning) return;
   const token = turnToken;
   cpuTurnRunning = true;
   let prevSeg = null;
@@ -1615,10 +1805,10 @@ function runCpuTurn() {
       const liveScore = p.turnStart - soFar;
       const scoreSnapshot = { ...p, score: liveScore };
       const aim = chooseDemolishTarget(scoreSnapshot, dartInTurn);
-      const sigma = getDemolishSigma(p.cpuData.id);
-      const seg = generateCpuThrow(aim.number, p.cpuData.mpr, {
+      const sigma = getDemolishSigma(cpuPlayer.cpuData.id);
+      const seg = generateCpuThrow(aim.number, cpuPlayer.cpuData.mpr, {
         prevSeg,
-        dartsThrown: p.totalDartsThrown,
+        dartsThrown: cpuPlayer.totalDartsThrown,
         sigmaOverride: sigma,
         sigmaROverride: Math.max(5, sigma * 0.6),
         aimROverride: aim.aimR,
@@ -1664,16 +1854,17 @@ function triggerSD(idxs) {
 function activateSD(i) {
   document.querySelectorAll('.sd-player').forEach((el,j)=>el.classList.toggle('active',j===i));
   const p=sdPlayers[i]; sfxNextLocal(); gameActive=true; seenThrows=0;
-  if (p.isCpu) setTimeout(()=>runSDCpuThrow(p),1500);
+  if (getActiveThrower(p).isCpu) setTimeout(()=>runSDCpuThrow(p),1500);
 }
 function runSDCpuThrow(p) {
   if (!sdActive||!gameActive) return;
   // SD: aim bull. For top tiers the calibrated sigma + tight sigmaR gives
   // them a real shot at D25; weak tiers will scatter wildly, which is the
   // intended SD drama.
-  const sigma = getDemolishSigma(p.cpuData.id);
-  const seg = generateCpuThrow(25, p.cpuData.mpr, {
-    dartsThrown: p.totalDartsThrown,
+  const cpuPlayer = getActiveThrower(p);
+  const sigma = getDemolishSigma(cpuPlayer.cpuData.id);
+  const seg = generateCpuThrow(25, cpuPlayer.cpuData.mpr, {
+    dartsThrown: cpuPlayer.totalDartsThrown,
     sigmaOverride: sigma,
     sigmaROverride: Math.max(5, sigma * 0.6),
     // aimROverride irrelevant for bull (target=25 skips aimR logic).
@@ -1710,10 +1901,10 @@ function handleWS(data){
     throwLog.push(throws[seenThrows]);
     const result=parseSegScore(seg);
     if(sdActive) registerSDDart(result?result.score:0,result?result.seg:null);
-    else if(!turnEnded&&!players[cp].isCpu) registerDart(result?result.score:null,result?result.seg:null);
+    else if(!turnEnded&&!getActiveThrower(players[cp]).isCpu) registerDart(result?result.score:null,result?result.seg:null);
     seenThrows=tc;
   }
-  if(!sdActive&&gameActive&&!turnEnded&&!players[cp].isCpu&&numThrows>0&&numThrows>seenThrows&&tc===seenThrows){
+  if(!sdActive&&gameActive&&!turnEnded&&!getActiveThrower(players[cp]).isCpu&&numThrows>0&&numThrows>seenThrows&&tc===seenThrows){
     if(!missTimer)missTimer=setTimeout(()=>{
       missTimer=null;
       if(seenThrows<numThrows&&!turnEnded&&gameActive){registerDart(null,null);seenThrows=numThrows;}
@@ -1738,7 +1929,7 @@ function manualDart(num) {
   // braces.
   const ae = document.activeElement;
   if (ae && ae.tagName === 'BUTTON' && ae.blur) ae.blur();
-  if (!gameActive || turnEnded || darts.length >= 3) return;
+  if (!gameActive || turnEnded || darts.length >= 3 || getActiveThrower(players[cp]).isCpu) return;
   if (num === 0) {
     registerDart(null, { name: 'M0', number: 0, multiplier: 0 });
   } else {
@@ -1755,20 +1946,49 @@ function manualDart(num) {
 function undoLastDart() {
   if (!gameActive || !darts.length) return;
   const p = players[cp];
-  const soFarBefore = darts.reduce((a, d) => a + d.score, 0);
-  if (p.turnStart - soFarBefore < 0) return; // bust state, can't undo
-  darts.pop();
-  p.totalDartsThrown--;
-  const soFar = darts.reduce((a, d) => a + d.score, 0);
-  p.score = p.turnStart - soFar;
-  restoreGems(cp);
-  updateScore(cp);
+  if (getActiveThrower(p).isCpu) return;
+  const removed = darts.pop();
+
+  // Cancel any delayed bonus application/result left by the removed dart.
+  bonusTimers.forEach(id => clearTimeout(id));
+  bonusTimers = [];
+  hideBonusPopup();
+  hideBonusWarning();
+
+  if (removed.undoState) {
+    removed.undoState.players.forEach((state, i) => {
+      if (!players[i]) return;
+      players[i].score = state.score;
+      players[i].turnStart = state.turnStart;
+      players[i].gemsRemoved = state.gemsRemoved;
+      players[i].totalDartsThrown = state.totalDartsThrown;
+      players[i].bonusCountdown = state.bonusCountdown;
+      players[i].pendingBonus = state.pendingBonus ? {...state.pendingBonus} : null;
+      if (players[i].isTeam && state.members) {
+        state.members.forEach((memberState, memberIdx) => {
+          if (!players[i].members[memberIdx]) return;
+          players[i].members[memberIdx].totalDartsThrown = memberState.totalDartsThrown;
+          players[i].members[memberIdx].totalPoints = memberState.totalPoints;
+        });
+      }
+    });
+    activeBonus = removed.undoState.activeBonus ? {...removed.undoState.activeBonus} : null;
+  } else {
+    // Compatibility for any in-memory dart created before snapshot support.
+    p.totalDartsThrown = Math.max(0, p.totalDartsThrown - 1);
+    const soFar = darts.reduce((a, d) => a + d.score, 0);
+    p.score = p.turnStart - soFar;
+    activeBonus = null;
+  }
+  players.forEach((_, i) => { restoreGems(i); updateScore(i); });
   const idx = darts.length;
   const slot = document.getElementById('dc' + idx);
   if (slot) { slot.querySelector('.dart-slot-val').textContent = '—'; slot.className = 'dart-slot'; }
   document.getElementById('last-dart-val').textContent =
     darts.length ? (darts[darts.length - 1].score || 'MISS') : '—';
   turnEnded = false;
+  if (activeBonus) showBonusPopup(activeBonus);
+  else if (p.pendingBonus && p.pendingBonus.dartIdx === darts.length + 1) showBonusWarning(p.pendingBonus.type);
   updatePanel();
 }
 
@@ -1824,12 +2044,309 @@ function updateCheckoutHint() {
 // ══ UI ══
 function updatePanel(){
   const p=players[cp];if(!p)return;
-  const tn=document.getElementById('turn-name');if(tn){tn.textContent=p.name;tn.style.color=p.color;}
+  const thrower = getActiveThrower(p);
+  const tn=document.getElementById('turn-name');if(tn){tn.textContent=thrower.name;tn.style.color=p.color;}
   const ts=document.getElementById('turn-sub');
-  if(ts)ts.textContent=turnEnded?'Waiting...':(p.isCpu?'CPU thinking...':'Dart '+(darts.length+1)+' of 3');
+  if(ts)ts.textContent=turnEnded?'Waiting...':`${p.isTeam ? p.name + ' · ' : ''}${thrower.isCpu?'CPU thinking...':'Dart '+(darts.length+1)+' of 3'}`;
   const nb=document.getElementById('next-player-btn');
-  if(nb)nb.style.display=(turnEnded&&!p.isCpu&&gameActive)?'':'none';
+  if(nb)nb.style.display=(turnEnded&&!thrower.isCpu&&gameActive)?'':'none';
+  document.querySelectorAll('.keypad-wrap .kp-btn').forEach(btn => {
+    const isUndo = btn.classList.contains('kp-undo');
+    btn.disabled = thrower.isCpu || !gameActive || (isUndo ? !darts.length : turnEnded);
+  });
   updateCheckoutHint();
+}
+
+// ══ TOURNAMENT ══
+function cloneRosterPlayer(player) {
+  return {
+    name:player.name, color:player.color, flag:player.flag,
+    isCpu:player.isCpu, cpuData:player.cpuData,
+  };
+}
+
+function tournamentEntrants() {
+  if (tournamentType === 'singles') {
+    return setupPlayers.map((player, i) => ({
+      id:`entrant-${Date.now()}-${i}`,
+      name:player.name,
+      roster:[cloneRosterPlayer(player)],
+    }));
+  }
+  const entrants = [];
+  for (let i = 0; i < setupPlayers.length; i += 2) {
+    const roster = setupPlayers.slice(i, i + 2).map(cloneRosterPlayer);
+    entrants.push({
+      id:`team-${Date.now()}-${i / 2}`,
+      name:teamName(roster),
+      roster,
+    });
+  }
+  return entrants;
+}
+
+function shuffleArray(items) {
+  for (let i = items.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [items[i], items[j]] = [items[j], items[i]];
+  }
+  return items;
+}
+
+function createTournamentRound(entrants) {
+  const matches = [];
+  for (let i = 0; i < entrants.length; i += 2) {
+    matches.push({
+      id:`match-${Date.now()}-${i}-${Math.random().toString(36).slice(2,7)}`,
+      a:entrants[i] || null,
+      b:entrants[i + 1] || null,
+      wins:[0,0],
+      winner:null,
+      startingPlayer:null,
+    });
+  }
+  return matches;
+}
+
+function beginTournament() {
+  if (!rosterIsValid()) return;
+  let entrants = tournamentEntrants();
+  if (document.getElementById('tournament-shuffle').checked) entrants = shuffleArray(entrants);
+  const size = 2 ** Math.ceil(Math.log2(entrants.length));
+  const byeCount = size - entrants.length;
+  const seeded = [];
+  let cursor = 0;
+  for (let i = 0; i < byeCount; i++) seeded.push(entrants[cursor++], null);
+  while (cursor < entrants.length) seeded.push(entrants[cursor++]);
+
+  tournamentState = {
+    version:1,
+    type:tournamentType,
+    bestOf:tournamentBestOf,
+    score:_score,
+    multiplier:_mult,
+    rounds:[createTournamentRound(seeded)],
+    current:null,
+    champion:null,
+  };
+  activeTournamentMatch = null;
+  normalizeTournament();
+  saveTournament();
+  renderTournament();
+}
+
+function normalizeTournament() {
+  if (!tournamentState) return;
+  for (let roundIdx = 0; roundIdx < tournamentState.rounds.length; roundIdx++) {
+    const round = tournamentState.rounds[roundIdx];
+    round.forEach(match => {
+      if (!match.winner && match.a && !match.b) match.winner = match.a;
+      if (!match.winner && !match.a && match.b) match.winner = match.b;
+    });
+    const openIdx = round.findIndex(match => !match.winner && match.a && match.b);
+    if (openIdx >= 0) {
+      tournamentState.current = {roundIndex:roundIdx, matchIndex:openIdx};
+      tournamentState.champion = null;
+      return;
+    }
+    if (round.some(match => !match.winner)) return;
+    if (round.length === 1) {
+      tournamentState.current = null;
+      tournamentState.champion = round[0].winner;
+      return;
+    }
+    if (!tournamentState.rounds[roundIdx + 1]) {
+      tournamentState.rounds.push(createTournamentRound(round.map(match => match.winner)));
+    }
+  }
+}
+
+function currentTournamentMatch() {
+  if (!tournamentState || !tournamentState.current) return null;
+  const {roundIndex, matchIndex} = tournamentState.current;
+  return tournamentState.rounds[roundIndex] && tournamentState.rounds[roundIndex][matchIndex];
+}
+
+function tournamentRoundName(round, index) {
+  if (round.length === 1) return 'FINAL';
+  if (round.length === 2) return 'SEMI-FINALS';
+  if (round.length === 4) return 'QUARTER-FINALS';
+  return `ROUND ${index + 1}`;
+}
+
+function entrantDetail(entrant) {
+  if (!entrant) return 'BYE';
+  if (entrant.roster.length === 1) return entrant.roster[0].isCpu ? 'CPU' : 'PLAYER';
+  return entrant.roster.map(player => escapeHTML(player.name)).join(' · ');
+}
+
+function renderTournament() {
+  if (!tournamentState) return;
+  normalizeTournament();
+  showScreen('tournament');
+  document.getElementById('tournament-kicker').textContent = tournamentState.type === 'teams' ? '2v2 TEAM TOURNAMENT' : '1v1 SINGLES TOURNAMENT';
+  document.getElementById('tournament-title').textContent = tournamentState.champion ? 'CHAMPION' : `BEST OF ${tournamentState.bestOf}`;
+  const currentEl = document.getElementById('tournament-current');
+  const playBtn = document.getElementById('play-tournament-match-btn');
+  if (tournamentState.champion) {
+    currentEl.innerHTML = `<div class="champion-card">
+      <div class="champion-trophy">🏆</div>
+      <div class="champion-name">${escapeHTML(tournamentState.champion.name)}</div>
+      <div class="champion-detail">${entrantDetail(tournamentState.champion)}</div>
+    </div>`;
+    playBtn.style.display = 'none';
+    spawnConfetti();
+  } else {
+    const match = currentTournamentMatch();
+    const needed = Math.ceil(tournamentState.bestOf / 2);
+    currentEl.innerHTML = `<div class="current-match-label">NEXT MATCH · FIRST TO ${needed}</div>
+      <div class="current-matchup">
+        <div><strong>${escapeHTML(match.a.name)}</strong><span>${entrantDetail(match.a)}</span></div>
+        <b>${match.wins[0]} <em>VS</em> ${match.wins[1]}</b>
+        <div><strong>${escapeHTML(match.b.name)}</strong><span>${entrantDetail(match.b)}</span></div>
+      </div>`;
+    playBtn.style.display = '';
+    playBtn.textContent = match.wins[0] || match.wins[1] ? 'CONTINUE MATCH' : 'PLAY MATCH';
+  }
+
+  const displayRounds = tournamentState.rounds.slice();
+  let expectedMatches = tournamentState.rounds[0].length;
+  while (expectedMatches > 1) {
+    expectedMatches /= 2;
+    const roundIdx = Math.log2(tournamentState.rounds[0].length) - Math.log2(expectedMatches);
+    if (!displayRounds[roundIdx]) {
+      displayRounds[roundIdx] = Array.from({length:expectedMatches}, () => ({
+        a:null, b:null, wins:[0,0], winner:null, placeholder:true,
+      }));
+    }
+  }
+  document.getElementById('tournament-bracket').innerHTML = displayRounds.map((round, roundIdx) => `
+    <section class="bracket-round">
+      <h2>${tournamentRoundName(round, roundIdx)}</h2>
+      ${round.map((match, matchIdx) => {
+        const current = tournamentState.current && tournamentState.current.roundIndex === roundIdx && tournamentState.current.matchIndex === matchIdx;
+        return `<div class="bracket-match ${current ? 'current' : ''} ${match.winner ? 'complete' : ''}">
+          <div class="bracket-side ${match.winner && match.a && match.winner.id === match.a.id ? 'winner' : ''}"><span>${match.placeholder ? 'TBD' : match.a ? escapeHTML(match.a.name) : 'BYE'}</span><b>${match.wins[0]}</b></div>
+          <div class="bracket-side ${match.winner && match.b && match.winner.id === match.b.id ? 'winner' : ''}"><span>${match.placeholder ? 'TBD' : match.b ? escapeHTML(match.b.name) : 'BYE'}</span><b>${match.wins[1]}</b></div>
+        </div>`;
+      }).join('')}
+    </section>`).join('');
+}
+
+function saveTournament() {
+  if (!tournamentState) return;
+  try { localStorage.setItem(TOURNAMENT_KEY, JSON.stringify(tournamentState)); } catch {}
+  updateResumeButton();
+}
+
+function updateResumeButton() {
+  const btn = document.getElementById('resume-tournament-btn');
+  if (!btn) return;
+  try { btn.style.display = localStorage.getItem(TOURNAMENT_KEY) ? '' : 'none'; }
+  catch { btn.style.display = 'none'; }
+}
+
+function resumeTournament() {
+  try { tournamentState = JSON.parse(localStorage.getItem(TOURNAMENT_KEY) || 'null'); }
+  catch { tournamentState = null; }
+  if (!tournamentState || !Array.isArray(tournamentState.rounds)) return;
+  tournamentType = tournamentState.type;
+  tournamentBestOf = tournamentState.bestOf;
+  _score = tournamentState.score;
+  _scoreIdx = SCORE_OPTIONS.indexOf(_score);
+  if (_scoreIdx < 0) _scoreIdx = 2;
+  _mult = tournamentState.multiplier;
+  document.getElementById('score-val').textContent = _score;
+  document.getElementById('mult-val').textContent = '×' + _mult;
+  activeTournamentMatch = null;
+  renderTournament();
+}
+
+function playCurrentTournamentMatch() {
+  const match = currentTournamentMatch();
+  if (!match || match.winner) return;
+  activeTournamentMatch = {...tournamentState.current};
+  setupPlayers = [...match.a.roster, ...match.b.roster].map(cloneRosterPlayer);
+  isTeamMatch = tournamentState.type === 'teams';
+  if (match.startingPlayer === null) match.startingPlayer = Math.floor(Math.random() * setupPlayers.length);
+  legNumber = match.wins[0] + match.wins[1];
+  startingPlayer = (match.startingPlayer + legNumber) % setupPlayers.length;
+  gameSession = null;
+  startGame();
+}
+
+function recordTournamentLeg(winner) {
+  if (!tournamentState || !activeTournamentMatch) return null;
+  const {roundIndex, matchIndex} = activeTournamentMatch;
+  const match = tournamentState.rounds[roundIndex][matchIndex];
+  if (!match || match.winner) return null;
+  const side = players.indexOf(winner);
+  if (side !== 0 && side !== 1) return null;
+  match.wins[side]++;
+  const needed = Math.ceil(tournamentState.bestOf / 2);
+  if (match.wins[side] >= needed) match.winner = side === 0 ? match.a : match.b;
+  const label = document.getElementById('win-label');
+  if (label) label.textContent = match.winner ? 'MATCH WON!' : 'LEG WON!';
+  const nextBtn = document.getElementById('next-leg-btn');
+  if (nextBtn) nextBtn.textContent = match.winner ? 'RETURN TO BRACKET' : 'PLAY NEXT LEG';
+  saveTournament();
+  return {roundIndex, matchIndex, side};
+}
+
+function reverseTournamentLeg(result) {
+  if (!tournamentState || !result) return;
+  const match = tournamentState.rounds[result.roundIndex] && tournamentState.rounds[result.roundIndex][result.matchIndex];
+  if (!match) return;
+  match.wins[result.side] = Math.max(0, match.wins[result.side] - 1);
+  match.winner = null;
+  tournamentState.champion = null;
+  tournamentState.current = {roundIndex:result.roundIndex, matchIndex:result.matchIndex};
+  saveTournament();
+}
+
+function restoreTournamentRosterToSetup() {
+  if (!tournamentState || !tournamentState.rounds || !tournamentState.rounds[0]) return;
+  const seen = new Set();
+  const entrants = [];
+  tournamentState.rounds[0].forEach(match => {
+    [match.a, match.b].forEach(entrant => {
+      if (entrant && !seen.has(entrant.id)) { seen.add(entrant.id); entrants.push(entrant); }
+    });
+  });
+  setupPlayers = entrants.flatMap(entrant => entrant.roster.map(cloneRosterPlayer));
+}
+
+function returnToTournamentSetup() {
+  restoreTournamentRosterToSetup();
+  playMode = 'tournament';
+  showScreen('setup');
+  selectPlayMode('tournament', document.querySelector('[data-mode="tournament"]'));
+  selectTournamentType(tournamentType, document.querySelector(`[data-tournament-type="${tournamentType}"]`));
+  selectTournamentBestOf(tournamentBestOf, document.querySelector(`[data-best-of="${tournamentBestOf}"]`));
+}
+
+function resetTournament() {
+  if (!confirm('Reset this tournament?')) return;
+  restoreTournamentRosterToSetup();
+  tournamentState = null;
+  activeTournamentMatch = null;
+  try { localStorage.removeItem(TOURNAMENT_KEY); } catch {}
+  document.getElementById('confetti').innerHTML = '';
+  updateResumeButton();
+  returnToTournamentSetup();
+}
+
+function finishedStatEntries(winner) {
+  if (!isTeamMatch) {
+    return players.map(p => ({
+      name:p.name, flag:p.flag, isCpu:p.isCpu, won:p===winner,
+      points:startScore-p.score, darts:p.totalDartsThrown,
+    }));
+  }
+  return players.flatMap(team => team.members.map(member => ({
+    name:member.name, flag:member.flag, isCpu:member.isCpu, won:team===winner,
+    points:member.totalPoints || 0, darts:member.totalDartsThrown || 0,
+  })));
 }
 
 async function showWin(w) {
@@ -1842,12 +2359,15 @@ async function showWin(w) {
   // case with a single misread dart to undo). Excludes CPU wins, sudden death,
   // and last-player-standing (where the winner isn't the current thrower).
   const _wi = players.indexOf(w);
-  const _canBack = !w.isCpu && _wi === cp && darts.length > 0 && !sdActive;
+  const winnerThrower = getActiveThrower(w);
+  const _canBack = !winnerThrower.isCpu && _wi === cp && darts.length > 0 && !sdActive;
   const _backBtn = document.getElementById('back-to-game-btn');
   if (_backBtn) _backBtn.style.display = _canBack ? '' : 'none';
+  const statEntries = finishedStatEntries(w);
   lastResult = _canBack ? {
     winnerIdx: _wi,
-    players: players.map(p => ({ name: p.name, isCpu: p.isCpu, won: p === w, points: startScore - p.score, darts: p.totalDartsThrown })),
+    winnerName: w.name,
+    players: statEntries,
     savePromise: Promise.resolve()
   } : null;
 
@@ -1856,38 +2376,49 @@ async function showWin(w) {
   const scoreEl = document.getElementById('win-score');
   const legStr = legNumber > 0 ? `Leg ${legNumber + 1} · ` : '';
   const wPPR = getPlayerPPR(w);
-  if (scoreEl) scoreEl.textContent = `${legStr}${w.totalDartsThrown} darts${wPPR ? ' · PPR ' + wPPR : ''}`;
+  if (scoreEl) {
+    const dartWord = w.totalDartsThrown === 1 ? 'dart' : 'darts';
+    scoreEl.textContent = `${legStr}${w.totalDartsThrown} ${dartWord}${wPPR ? ' · PPR ' + wPPR : ''}`;
+  }
 
   const othersEl = document.getElementById('win-others');
   if (othersEl) {
     othersEl.innerHTML = players.filter(p => p !== w).map(p => {
       const ppr = getPlayerPPR(p);
+      const dartWord = p.totalDartsThrown === 1 ? 'dart' : 'darts';
       return `<div class="win-other-card">
         <div class="win-other-name" style="color:${p.color}">${escapeHTML(p.name)}</div>
-        <div class="win-other-score">${p.score} remaining · ${p.totalDartsThrown} darts${ppr ? ' · PPR ' + ppr : ''}</div>
+        <div class="win-other-score">${p.score} remaining · ${p.totalDartsThrown} ${dartWord}${ppr ? ' · PPR ' + ppr : ''}</div>
       </div>`;
     }).join('');
   }
 
-  setupPlayers = players.map(p => ({
-    name: p.name, color: p.color, flag: p.flag, isCpu: p.isCpu, cpuData: p.cpuData
-  }));
+  setupPlayers = isTeamMatch
+    ? players.flatMap(team => team.members.map(member => ({
+        name:member.name, color:member.color, flag:member.flag, isCpu:member.isCpu, cpuData:member.cpuData
+      })))
+    : players.map(p => ({
+        name:p.name, color:p.color, flag:p.flag, isCpu:p.isCpu, cpuData:p.cpuData
+      }));
   renderPlayerList();
   renderRecentPlayers();
 
   const key = getSessionKey();
   if (!gameSession || gameSession.playerKeys !== key) {
     gameSession = { playerKeys: key, wins: {} };
-    setupPlayers.forEach(p => { gameSession.wins[p.name] = 0; });
+    (isTeamMatch ? players : setupPlayers).forEach(p => { gameSession.wins[p.name] = 0; });
   }
   gameSession.wins[w.name] = (gameSession.wins[w.name] || 0) + 1;
+
+  const tournamentLeg = recordTournamentLeg(w);
+  if (lastResult && tournamentLeg) lastResult.tournamentLeg = tournamentLeg;
 
   const sessionEl = document.getElementById('win-session');
   if (sessionEl) {
     const total = Object.values(gameSession.wins).reduce((a, b) => a + b, 0);
     if (total >= 1) {
-      if (setupPlayers.length === 2) {
-        const [p0, p1] = setupPlayers;
+      if (isTeamMatch || setupPlayers.length === 2) {
+        const [p0, p1] = isTeamMatch ? players : setupPlayers;
         sessionEl.textContent = `${p0.name}  ${gameSession.wins[p0.name] || 0} – ${gameSession.wins[p1.name] || 0}  ${p1.name}`;
       } else {
         sessionEl.textContent = `Series: ${setupPlayers.map(p => `${p.name} ${gameSession.wins[p.name] || 0}`).join(' · ')}`;
@@ -1903,23 +2434,28 @@ async function showWin(w) {
   const allCpu = setupPlayers.every(p => p.isCpu);
   if (allCpu) {
     let secs = 5;
+    const tournamentMatchComplete = tournamentState && activeTournamentMatch &&
+      tournamentState.rounds[activeTournamentMatch.roundIndex][activeTournamentMatch.matchIndex].winner;
+    const autoDestination = tournamentMatchComplete ? 'Bracket' : 'Next leg';
     const autoEl = document.getElementById('cpu-auto-msg');
     const stopBtn = document.getElementById('cpu-stop-btn');
     const nextBtn = document.getElementById('next-leg-btn');
-    if (autoEl) { autoEl.textContent = `Next leg in ${secs}s…`; autoEl.style.display = ''; }
+    if (autoEl) { autoEl.textContent = `${autoDestination} in ${secs}s…`; autoEl.style.display = ''; }
     if (stopBtn) stopBtn.style.display = '';
     if (nextBtn) nextBtn.style.display = 'none';
     window._cpuAutoTimer = setInterval(() => {
       secs--;
-      if (secs > 0) { if (autoEl) autoEl.textContent = `Next leg in ${secs}s…`; }
+      if (secs > 0) { if (autoEl) autoEl.textContent = `${autoDestination} in ${secs}s…`; }
       else { clearInterval(window._cpuAutoTimer); window._cpuAutoTimer = null; nextLeg(); }
     }, 1000);
   }
 
   // Fire all saves together and expose a combined promise so Back to Game can
   // wait for them to settle before reversing (prevents reversal racing insert).
-  const statPromises = players.map(p =>
-    saveX01Stat(p.name, p.flag, p === w, startScore - p.score, p.totalDartsThrown, p.isCpu));
+  const statPromises = statEntries.map(p => {
+    if (testMode && !p.isCpu) return Promise.resolve();
+    return saveX01Stat(p.name, p.flag, p.won, p.points, p.darts, p.isCpu);
+  });
   if (lastResult) lastResult.savePromise = Promise.allSettled(statPromises);
   try { await Promise.all(statPromises); } catch(e) { console.error('Save error:', e); }
 }
@@ -1964,9 +2500,10 @@ async function backFromWinner() {
   // Reverse the mistaken win's user-facing stats + series immediately.
   r.players.forEach(s => { if (!(testMode && !s.isCpu)) reverseX01StatLocal(s); });
   if (gameSession) {
-    const wName = r.players[r.winnerIdx] && r.players[r.winnerIdx].name;
+    const wName = r.winnerName || (r.players[r.winnerIdx] && r.players[r.winnerIdx].name);
     if (wName && gameSession.wins[wName]) gameSession.wins[wName] = Math.max(0, gameSession.wins[wName] - 1);
   }
+  if (r.tournamentLeg) reverseTournamentLeg(r.tournamentLeg);
 
   // Un-win the winner and return to the live game (they were the current
   // thrower when they checked out).
@@ -2016,6 +2553,22 @@ function nextLeg() {
   stopWinMusic();
   winLocked = false;
   document.getElementById('confetti').innerHTML = '';
+  if (tournamentState && activeTournamentMatch) {
+    const match = tournamentState.rounds[activeTournamentMatch.roundIndex][activeTournamentMatch.matchIndex];
+    if (match && match.winner) {
+      activeTournamentMatch = null;
+      normalizeTournament();
+      saveTournament();
+      renderTournament();
+      return;
+    }
+    if (match) {
+      legNumber = match.wins[0] + match.wins[1];
+      startingPlayer = (match.startingPlayer + legNumber) % setupPlayers.length;
+      startGame();
+      return;
+    }
+  }
   const key = getSessionKey();
   if (!gameSession || gameSession.playerKeys !== key) {
     gameSession = null; legNumber = 0;
@@ -2036,25 +2589,74 @@ function goHome(){
 
 // ══ KEYBOARD ══
 document.addEventListener('keydown',e=>{
-  // If an input or textarea has focus, let it handle the key (e.g. player
-  // name modal). Only intercept when focus is loose or on a non-input.
   const ae = document.activeElement;
-  const inText = ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA');
+  const humanModal = document.getElementById('human-modal');
+  if(humanModal && humanModal.classList.contains('open')){
+    const nameInput = document.getElementById('new-human-name');
+    const targetIsField = e.target && e.target.matches &&
+      e.target.matches('input, textarea, select, [contenteditable="true"]');
+
+    if(e.key==='Enter' && ae===nameInput){
+      e.preventDefault();
+      confirmAddHuman();
+      return;
+    }
+
+    // A few air-mouse receivers move DOM focus back to the page while their
+    // physical keyboard remains active. Recover that first character instead
+    // of passing it to Demolish's scoring shortcuts.
+    if(!targetIsField && ae!==nameInput && !e.ctrlKey && !e.metaKey && !e.altKey){
+      nameInput.focus({preventScroll:true});
+      const start = nameInput.selectionStart ?? nameInput.value.length;
+      const end = nameInput.selectionEnd ?? start;
+      let value = nameInput.value;
+      let caret = start;
+      if(e.key==='Backspace'){
+        const from = start===end ? Math.max(0,start-1) : start;
+        value = value.slice(0,from)+value.slice(end);
+        caret = from;
+        e.preventDefault();
+      }else if(e.key==='Delete'){
+        const to = start===end ? Math.min(value.length,end+1) : end;
+        value = value.slice(0,start)+value.slice(to);
+        caret = start;
+        e.preventDefault();
+      }else if(e.key.length===1){
+        const maxLength = nameInput.maxLength>0 ? nameInput.maxLength : Infinity;
+        value = (value.slice(0,start)+e.key+value.slice(end)).slice(0,maxLength);
+        caret = Math.min(start+e.key.length,value.length);
+        e.preventDefault();
+      }
+      if(e.defaultPrevented){
+        nameInput.value = value;
+        nameInput.setSelectionRange(caret,caret);
+        nameInput.dispatchEvent(new Event('input',{bubbles:true}));
+      }
+    }
+    return;
+  }
+
+  // Let any other editable field handle its own keys. Only intercept when
+  // focus is loose or on a non-input control.
+  const inText = ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable);
+  if(inText)return;
+  const keyboardPlayer = getActiveThrower(sdActive ? sdPlayers[sdIdx] : players[cp]);
+  if(!gameActive || !keyboardPlayer || keyboardPlayer.isCpu)return;
   if(e.key===' '||e.key==='Enter'){
-    if(inText)return;
+    if(sdActive)return;
     // Stop browsers from firing a synthetic click on whichever keypad button
     // currently has focus (the cause of phantom S-number darts on space).
     e.preventDefault();
     if(ae && ae.tagName === 'BUTTON' && ae.blur) ae.blur();
-    if(gameActive||turnEnded)advanceTurn();
+    advanceTurn();
     return;
   }
-  if(inText)return;
   const n=parseInt(e.key);
   if(!isNaN(n)&&n>=0&&n<=9){
     const s=n===0?null:{number:n,multiplier:1,name:'S'+n,bed:'SingleOuter'};
     if(sdActive)registerSDDart(n,s);else registerDart(n?n:null,s);return;
   }
+  if(sdActive)return;
   if(e.key==='t')registerDart(60,{number:20,multiplier:3,name:'T20',bed:'Triple'});
   if(e.key==='d')registerDart(40,{number:20,multiplier:2,name:'D20',bed:'Double'});
   if(e.key==='b')registerDart(50,{number:25,multiplier:2,name:'D25',bed:'Double'});
@@ -2076,6 +2678,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   buildStarfield();
   buildCpuGrid();
   renderRecentPlayers();
+  updateResumeButton();
   initSpeech();
   initAutodarts(handleWS);
   initNeonDB();

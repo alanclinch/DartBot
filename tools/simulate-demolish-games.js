@@ -88,6 +88,51 @@ function checkoutDartTarget(path, dartInTurn) {
   return { number: num, aimR };
 }
 
+// Straight Out checkout routing used by the live Demolish game. The legacy
+// double-out table above remains for historical calibration comparisons, but
+// live target choice must allow any exact-zero finish (including S1).
+function oneDartLabel(n) {
+  if (n <= 0 || n > 60) return null;
+  if (n === 50) return 'Bull';
+  if (n === 25) return '25';
+  if (n >= 1 && n <= 20) return String(n);
+  if (n % 3 === 0 && n / 3 <= 20) return 'T' + (n / 3);
+  if (n % 2 === 0 && n / 2 <= 20) return 'D' + (n / 2);
+  return null;
+}
+function getStraightOutSuggestion(remaining, dartsLeft) {
+  if (remaining <= 0 || dartsLeft <= 0 || remaining > dartsLeft * 60) return null;
+  const d1 = oneDartLabel(remaining);
+  if (d1) return d1;
+  if (dartsLeft === 1) return null;
+  const highs = [
+    ['T20',60],['T19',57],['T18',54],['T17',51],['T16',48],
+    ['Bull',50],['T15',45],['T14',42],['T13',39],['T12',36],
+    ['T11',33],['T10',30],['D20',40],['D19',38],['D18',36],['D17',34],
+  ];
+  for (const [label, value] of highs) {
+    const rest = remaining - value;
+    if (rest > 0) {
+      const d2 = oneDartLabel(rest);
+      if (d2) return label + ' + ' + d2;
+    }
+  }
+  if (dartsLeft === 2) return null;
+  const highs3 = [['T20',60],['T19',57],['T18',54],['T17',51],['Bull',50]];
+  for (const [label1, value1] of highs3) {
+    const rest1 = remaining - value1;
+    if (rest1 <= 0) continue;
+    for (const [label2, value2] of highs) {
+      const rest2 = rest1 - value2;
+      if (rest2 > 0 && rest2 <= 60) {
+        const d3 = oneDartLabel(rest2);
+        if (d3) return label1 + ' + ' + label2 + ' + ' + d3;
+      }
+    }
+  }
+  return null;
+}
+
 // ── Headless target selector — mirrors chooseDemolishTarget in demolish.js
 function chooseTarget(players, cp, dartInTurn, activeBonus, sdActive) {
   const player = players[cp];
@@ -98,20 +143,18 @@ function chooseTarget(players, cp, dartInTurn, activeBonus, sdActive) {
       && sigma <= 20) {
     const chase = { number: activeBonus.targetNumber, aimR: 134.5 };
     if (activeBonus.type === 'demolish') {
-      const worthBombing = players.some((opp, i) =>
-        i !== cp && !opp.checkedOut
-        && (TOTAL_BLOCKS - opp.gemsRemoved) / TOTAL_BLOCKS > 0.30);
+      const worthBombing = (TOTAL_BLOCKS - player.gemsRemoved) / TOTAL_BLOCKS > 0.30;
       if (worthBombing) return chase;
     } else if (activeBonus.type === 'heal') {
-      if (player.gemsRemoved / TOTAL_BLOCKS > 0.25) return chase;
+      const target = players[activeBonus.targetPlayerIdx];
+      if (target && target.gemsRemoved / TOTAL_BLOCKS > 0.25) return chase;
     }
   }
-  if (player.score <= 170 && player.score >= 2) {
-    const p = getCheckout(player.score);
-    if (p) {
-      const t = checkoutDartTarget(p, dartInTurn);
-      if (t) return t;
-    }
+  const checkout = getStraightOutSuggestion(player.score, Math.max(1, 3 - dartInTurn));
+  if (checkout) {
+    const firstDart = checkout.split(' + ')[0];
+    const t = checkoutDartTarget(firstDart, 0);
+    if (t) return t;
   }
   if (sdActive) return { number: 25, aimR: undefined };
   return { number: 20, aimR: 103.5 };

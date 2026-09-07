@@ -7,11 +7,11 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💥</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/css/game.css?v=2">
-<link rel="stylesheet" href="../assets/css/demolish.css?v=1">
+<link rel="stylesheet" href="../assets/css/demolish.css?v=3">
 <script src="../assets/js/autodarts.js?v=3"></script>
 <script src="../assets/js/utils.js?v=3"></script>
 <script src="../assets/js/demolish-bots.js?v=1"></script>
-<script src="../assets/js/demolish.js?v=3" defer></script>
+<script src="../assets/js/demolish.js?v=6" defer></script>
 </head>
 <body>
 <div id="starfield" aria-hidden="true"></div>
@@ -20,6 +20,40 @@
 <!-- SETUP -->
 <div id="setup" class="screen active">
   <div class="setup-title">DEMOLISH <span>💥</span></div>
+
+  <div class="setup-card">
+    <h3>Game Mode</h3>
+    <div class="variant-grid demolish-mode-grid">
+      <button class="variant-btn sel" data-mode="standard" onclick="selectPlayMode('standard',this)">STANDARD</button>
+      <button class="variant-btn" data-mode="teams" onclick="selectPlayMode('teams',this)">2v2 TEAMS</button>
+      <button class="variant-btn" data-mode="tournament" onclick="selectPlayMode('tournament',this)">TOURNAMENT</button>
+    </div>
+    <div class="variant-desc" id="mode-desc">Classic Demolish for 2–4 individual players.</div>
+  </div>
+
+  <div class="setup-card tournament-options" id="tournament-options" style="display:none;">
+    <h3>Tournament Settings</h3>
+    <div class="option-group">
+      <span class="option-label">Event</span>
+      <div class="variant-grid compact-grid">
+        <button class="variant-btn sel" data-tournament-type="singles" onclick="selectTournamentType('singles',this)">1v1 SINGLES</button>
+        <button class="variant-btn" data-tournament-type="teams" onclick="selectTournamentType('teams',this)">2v2 TEAMS</button>
+      </div>
+    </div>
+    <div class="option-group">
+      <span class="option-label">Match Length</span>
+      <div class="variant-grid compact-grid">
+        <button class="variant-btn sel" data-best-of="1" onclick="selectTournamentBestOf(1,this)">BEST OF 1</button>
+        <button class="variant-btn" data-best-of="3" onclick="selectTournamentBestOf(3,this)">BEST OF 3</button>
+        <button class="variant-btn" data-best-of="5" onclick="selectTournamentBestOf(5,this)">BEST OF 5</button>
+      </div>
+    </div>
+    <label class="setting-row tournament-shuffle-row">
+      <input type="checkbox" id="tournament-shuffle" checked>
+      <span>Shuffle first-round draw</span>
+    </label>
+    <button class="setting-action-btn tournament-resume-btn" id="resume-tournament-btn" onclick="resumeTournament()" style="display:none;">RESUME SAVED TOURNAMENT</button>
+  </div>
 
   <div class="setup-card">
     <h3>Game Settings</h3>
@@ -44,6 +78,7 @@
   <div class="setup-card">
     <h3>Players <span id="player-count-label" style="color:var(--muted);font-size:12px;opacity:.5;">(2–4)</span></h3>
     <div id="player-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+    <div id="team-preview" class="team-preview" style="display:none;"></div>
     <div class="add-btns" style="margin-top:4px;">
       <button class="add-btn" onclick="openHumanModal()">+ Human Player</button>
       <button class="add-btn" onclick="openCpuModal()">+ Computer Player</button>
@@ -51,7 +86,7 @@
     <div id="recent-players" class="recent-players"></div>
   </div>
 
-  <button class="start-btn" id="start-btn" onclick="newGame()" disabled>DEMOLISH!</button>
+  <button class="start-btn" id="start-btn" onclick="beginSelectedMode()" disabled>DEMOLISH!</button>
 
   <div class="setup-card">
     <h3>Settings</h3>
@@ -72,6 +107,25 @@
     <div class="setting-actions">
       <button class="setting-action-btn" onclick="window.location.href='../index.html'">Main Menu</button>
       <button class="setting-action-btn" onclick="showLog()">Show Throw Log</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOURNAMENT BRACKET -->
+<div id="tournament" class="screen">
+  <div class="tournament-shell">
+    <div class="tournament-heading-row">
+      <div>
+        <div class="tournament-kicker" id="tournament-kicker">DEMOLISH TOURNAMENT</div>
+        <h1 id="tournament-title">TOURNAMENT</h1>
+      </div>
+      <button class="setting-action-btn" onclick="returnToTournamentSetup()">SETUP</button>
+    </div>
+    <div class="tournament-current" id="tournament-current"></div>
+    <div class="tournament-bracket" id="tournament-bracket"></div>
+    <div class="tournament-actions">
+      <button class="start-btn" id="play-tournament-match-btn" onclick="playCurrentTournamentMatch()">PLAY MATCH</button>
+      <button class="win-btn" id="tournament-reset-btn" onclick="resetTournament()">RESET TOURNAMENT</button>
     </div>
   </div>
 </div>
@@ -219,8 +273,8 @@
       </div>
     </div>
     <div class="rules">
-      <div class="rule"><strong>Bomb</strong> — hit target to damage opponent</div>
-      <div class="rule"><strong>Rebuild</strong> — hit target to repair your blocks</div>
+      <div class="rule"><strong>Bomb</strong> — hit target to demolish your tower</div>
+      <div class="rule"><strong>Rebuild</strong> — hit target to rebuild an opponent</div>
     </div>
     <div id="leg-badge" style="display:none;text-align:center;font-family:'Orbitron',monospace;font-size:13px;letter-spacing:3px;color:var(--gold);border:1px solid rgba(252,211,77,.3);border-radius:8px;padding:6px 10px;background:rgba(252,211,77,.06);">LEG 1</div>
 
@@ -251,7 +305,7 @@
   <div class="winner-layout">
     <div class="win-card" style="width:100%;">
       <span class="win-trophy">🏆</span>
-      <div class="win-label">CHECKED OUT FIRST!</div>
+      <div class="win-label" id="win-label">CHECKED OUT FIRST!</div>
       <div class="win-name" id="win-name">—</div>
       <div class="win-score" id="win-score"></div>
     </div>

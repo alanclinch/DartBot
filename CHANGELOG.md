@@ -5,6 +5,25 @@ COPY RESULTS. Bump `DARTBOT_VERSION` in `assets/js/cricket.js` and the
 `#version-badge` text in `games/cricket.html` together, and add an entry here.
 (Placeholder 3-digit scheme `vNNN` for now — will revisit later.)
 
+## Demolish: optional teams and tournaments — 2026-09-07
+
+- Added an optional 2v2 mode with one shared tower per team and alternating turns in
+  Player 1, Opponent 1, Player 2, Opponent 2 order.
+- Added optional saved single-elimination tournaments for 3–16 singles players or 2–8 teams,
+  with automatic byes, best-of-1/3/5 matches, an optional shuffled draw, and resume/reset controls.
+- Kept Standard Demolish selected by default and preserved individual player statistics in team games.
+
+## Demolish: party-readiness fixes — 2026-09-07
+
+- Kept the new-player name field focused while its modal opens and recovered text sent by physical
+  air-mouse keyboards that unexpectedly return browser focus to the page.
+- Disabled Demolish scoring shortcuts while the name modal is open and made Enter add the player.
+- Prevented manual and keyboard scoring during CPU turns and visibly disabled those controls.
+- Made CPU checkout targeting follow Demolish's exact-zero Straight Out rules, including a score of 1.
+- Made Undo restore the complete pre-dart state after busts, bonuses, and still-running animations.
+- Corrected the Bomb/Rebuild explanations, PPR maths, one-dart grammar, Test Mode stat handling, and
+  the four-player spaceship position.
+
 ## Baseball: fixes from the first human-vs-human game — 2026-08-08
 Owner played it. "A mess." Four fixes, all from real play rather than simulation.
 
