@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sink to Zero — Autodarts</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚢</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/game.css?v=2">
+<link rel="stylesheet" href="../assets/css/sink-to-zero.css?v=3">
+<script src="../assets/js/autodarts.js?v=3"></script>
+<script src="../assets/js/utils.js?v=3"></script>
+<script src="../assets/js/sink-to-zero-bots.js?v=1"></script>
+<script src="../assets/js/sink-to-zero.js?v=3" defer></script>
+</head>
+<body>
+<div id="starfield" aria-hidden="true"></div>
+<div id="confetti"></div>
+
+<!-- SETUP -->
+<div id="setup" class="screen active">
+  <div class="setup-title">SINK TO ZERO <span>⚓</span></div>
+  <div class="setup-tagline">ALIEN CONTRACT WARS · SINK YOUR TARGET · SABOTAGE THE RACE</div>
+
+  <div class="setup-card">
+    <h3>Game Settings</h3>
+    <div class="option-row">
+      <span class="option-label">Starting Score</span>
+      <div class="counter-row">
+        <button class="cnt-btn" onclick="adjScore(-1)">−</button>
+        <div class="cnt-val" id="score-val">301</div>
+        <button class="cnt-btn" onclick="adjScore(1)">+</button>
+      </div>
+    </div>
+    <div class="option-row">
+      <span class="option-label">Score Multiplier</span>
+      <div class="counter-row">
+        <button class="cnt-btn" onclick="adjMult(-1)">−</button>
+        <div class="cnt-val" id="mult-val">×1</div>
+        <button class="cnt-btn" onclick="adjMult(1)">+</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="setup-card">
+    <h3>Players <span id="player-count-label" style="color:var(--muted);font-size:15px;opacity:.8;">(2–4)</span></h3>
+    <div id="player-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+    <div class="add-btns" style="margin-top:4px;">
+      <button class="add-btn" onclick="openHumanModal()">+ Human Player</button>
+      <button class="add-btn" onclick="openCpuModal()">+ Computer Player</button>
+    </div>
+    <div id="recent-players" class="recent-players"></div>
+  </div>
+
+  <button class="start-btn" id="start-btn" onclick="newGame()" disabled>COMMENCE FIRE</button>
+
+  <div class="setup-card">
+    <h3>Settings</h3>
+    <div class="settings-grid">
+      <label class="setting-row">
+        <input type="checkbox" id="voice-toggle" onchange="setVoice(this.checked)" checked>
+        <span>Voice Caller</span>
+      </label>
+      <label class="setting-row">
+        <input type="checkbox" id="sfx-toggle" onchange="setSfx(this.checked)" checked>
+        <span>Sound Effects</span>
+      </label>
+      <label class="setting-row">
+        <input type="checkbox" id="test-mode-toggle" onchange="setTestMode(this.checked)">
+        <span>Test Mode</span>
+      </label>
+    </div>
+    <div class="setting-actions">
+      <button class="setting-action-btn" onclick="window.location.href='../index.html'">Main Menu</button>
+      <button class="setting-action-btn" onclick="showLog()">Show Throw Log</button>
+    </div>
+  </div>
+</div>
+
+<!-- CPU MODAL -->
+<div id="cpu-modal" class="modal-overlay">
+  <div class="cpu-modal-box">
+    <h2>SELECT OPPONENT</h2>
+    <div class="cpu-grid" id="cpu-grid"></div>
+    <button class="cpu-modal-cancel" onclick="closeCpuModal()">Cancel</button>
+  </div>
+</div>
+
+<!-- HUMAN MODAL -->
+<div id="human-modal" class="modal-overlay">
+  <div class="cpu-modal-box" style="width:min(420px,96vw);">
+    <h2>ADD HUMAN PLAYER</h2>
+    <input type="text" id="new-human-name" class="modal-input" placeholder="Enter Name" maxlength="14">
+    <select id="new-human-flag" class="modal-input" style="cursor:pointer;">
+      <option value="sco" selected>Scotland</option>
+      <option value="eng">England</option>
+      <option value="wal">Wales</option>
+    </select>
+    <div style="display:flex;gap:12px;margin-top:8px;">
+      <button class="win-btn win-btn-primary" onclick="confirmAddHuman()">ADD PLAYER</button>
+      <button class="win-btn" onclick="closeHumanModal()">CANCEL</button>
+    </div>
+  </div>
+</div>
+
+<!-- GAME -->
+<div id="game" class="screen">
+  <div class="playfield" id="playfield">
+    <div class="stage-flash" id="stage-flash" aria-hidden="true"></div>
+    <div class="site-command" aria-hidden="true">
+      <span class="site-command-light"></span>
+      CONTRACT WARS · LIVE
+      <span class="site-command-light"></span>
+    </div>
+    <div class="tactical-panel" id="tactical-panel" aria-live="polite">
+      <div class="tactical-heading" id="tactical-heading">TACTICAL DART</div>
+      <div class="tactical-cards" id="tactical-cards"></div>
+    </div>
+    <div class="towers-area" id="towers-area"></div>
+  </div>
+  <div class="side-panel">
+    <div>
+      <div class="panel-label">Current Turn</div>
+      <div class="turn-info">
+        <div class="turn-player" id="turn-name">—</div>
+        <div class="turn-sub" id="turn-sub">Throw your darts</div>
+      </div>
+    </div>
+    <div>
+      <div class="panel-label">Darts</div>
+      <div class="dart-slots">
+        <div class="dart-slot" id="dc0"><div class="dart-slot-label">1ST</div><div class="dart-slot-val">—</div></div>
+        <div class="dart-slot" id="dc1"><div class="dart-slot-label">2ND</div><div class="dart-slot-val">—</div></div>
+        <div class="dart-slot" id="dc2"><div class="dart-slot-label">3RD</div><div class="dart-slot-val">—</div></div>
+      </div>
+    </div>
+    <div>
+      <div class="panel-label">Last Dart</div>
+      <div class="last-dart-box" style="padding:12px;text-align:center;">
+        <div class="last-dart-val" id="last-dart-val">—</div>
+        <div class="last-dart-lbl">Score</div>
+      </div>
+    </div>
+    <div>
+      <div class="panel-label">Manual Input</div>
+      <div class="keypad-wrap">
+        <div class="keypad-row">
+          <button class="kp-btn" onclick="manualDart(1)">1</button>
+          <button class="kp-btn" onclick="manualDart(2)">2</button>
+          <button class="kp-btn" onclick="manualDart(3)">3</button>
+          <button class="kp-btn" onclick="manualDart(4)">4</button>
+          <button class="kp-btn" onclick="manualDart(5)">5</button>
+        </div>
+        <div class="keypad-row">
+          <button class="kp-btn" onclick="manualDart(6)">6</button>
+          <button class="kp-btn" onclick="manualDart(7)">7</button>
+          <button class="kp-btn" onclick="manualDart(8)">8</button>
+          <button class="kp-btn" onclick="manualDart(9)">9</button>
+          <button class="kp-btn" onclick="manualDart(10)">10</button>
+        </div>
+        <div class="keypad-row">
+          <button class="kp-btn" onclick="manualDart(11)">11</button>
+          <button class="kp-btn" onclick="manualDart(12)">12</button>
+          <button class="kp-btn" onclick="manualDart(13)">13</button>
+          <button class="kp-btn" onclick="manualDart(14)">14</button>
+          <button class="kp-btn" onclick="manualDart(15)">15</button>
+        </div>
+        <div class="keypad-row">
+          <button class="kp-btn" onclick="manualDart(16)">16</button>
+          <button class="kp-btn" onclick="manualDart(17)">17</button>
+          <button class="kp-btn" onclick="manualDart(18)">18</button>
+          <button class="kp-btn" onclick="manualDart(19)">19</button>
+          <button class="kp-btn" onclick="manualDart(20)">20</button>
+        </div>
+        <div class="keypad-row">
+          <button class="kp-btn" onclick="manualDart(25)" style="flex:2;">BULL</button>
+          <button class="kp-btn kp-miss" onclick="manualDart(0)">MISS</button>
+          <button class="kp-btn kp-undo" onclick="undoLastDart()">UNDO</button>
+        </div>
+        <div class="keypad-row">
+          <button class="kp-btn kp-mod" id="kp-mod-double" onclick="toggleKeypadMod(2)">DOUBLE</button>
+          <button class="kp-btn kp-mod" id="kp-mod-treble" onclick="toggleKeypadMod(3)">TREBLE</button>
+        </div>
+      </div>
+    </div>
+    <div id="leg-badge" style="display:none;text-align:center;font-family:'Orbitron',monospace;font-size:13px;letter-spacing:3px;color:#56d7ff;border:1px solid rgba(86,215,255,.38);border-radius:8px;padding:6px 10px;background:rgba(86,215,255,.08);">LEG 1</div>
+
+    <div style="margin-top:auto;">
+      <div class="game-ws" style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <div class="ws-dot" id="game-ws-dot"></div>
+        <div class="ws-label" id="game-ws-label">Not Connected</div>
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:8px;">
+        <button class="end-btn" onclick="autodartsReset()" style="flex:1;font-size:11px;border-color:var(--muted);color:var(--muted);">RESET</button>
+        <button class="end-btn" onclick="autodartsCalibrate()" style="flex:1;font-size:11px;border-color:var(--muted);color:var(--muted);">CALIBRATE</button>
+      </div>
+      <button class="end-btn" id="next-player-btn" onclick="skipTurn()" style="display:none;border-color:var(--green);color:var(--green);margin-bottom:8px;">NEXT PLAYER →</button>
+      <button class="end-btn" onclick="quitGame()">↩ Quit to Menu</button>
+    </div>
+  </div>
+</div>
+
+<!-- SUDDEN DEATH -->
+<div id="sudden-death" class="screen">
+  <div class="sd-title">⚡ SUDDEN DEATH</div>
+  <div class="sd-sub" id="sd-sub">One dart each!</div>
+  <div class="sd-players" id="sd-players"></div>
+</div>
+
+<!-- WINNER -->
+<div id="winner" class="screen">
+  <div class="winner-layout">
+    <div class="win-card" style="width:100%;">
+      <span class="win-trophy">🏆</span>
+      <div class="win-label">TARGET SUNK!</div>
+      <div class="win-name" id="win-name">—</div>
+      <div class="win-score" id="win-score"></div>
+    </div>
+    <div class="win-others" id="win-others"></div>
+    <div id="win-session" style="display:none;color:var(--gold);font-family:'Orbitron',monospace;font-size:15px;letter-spacing:2px;text-align:center;padding:10px 0;border:1px solid rgba(252,211,77,.25);border-radius:10px;background:rgba(252,211,77,.05);margin:0 0 4px;"></div>
+    <div class="setup-card" style="margin:0;width:100%;">
+      <h3>Next Match Roster</h3>
+      <div id="player-list-winner" style="display:flex;flex-direction:column;gap:8px;"></div>
+      <div class="add-btns" style="margin-top:4px;">
+        <button class="add-btn" onclick="openHumanModal()">+ Human Player</button>
+        <button class="add-btn" onclick="openCpuModal()">+ Computer Player</button>
+      </div>
+      <div id="recent-players-winner" class="recent-players"></div>
+    </div>
+    <div id="cpu-auto-msg" style="display:none;text-align:center;color:var(--muted);font-family:'Share Tech Mono',monospace;font-size:13px;padding:4px 0;"></div>
+    <div class="win-buttons">
+      <button class="win-btn win-btn-primary" id="next-leg-btn" onclick="nextLeg()" style="font-size:18px;padding:20px;">PLAY NEXT LEG</button>
+      <button class="win-btn" id="back-to-game-btn" onclick="backFromWinner()" style="display:none;border-color:var(--amber);color:var(--amber);">↩ BACK TO GAME</button>
+      <button class="win-btn" id="cpu-stop-btn" onclick="stopCpuAuto()" style="display:none;border-color:var(--amber);color:var(--amber);">STOP AUTO</button>
+      <button class="win-btn win-btn-danger" onclick="goHome()">MENU</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOG MODAL -->
+<div id="log-modal">
+  <h2>Raw Throw Log</h2>
+  <textarea id="log-output" readonly></textarea>
+  <div style="display:flex;gap:14px;margin-top:20px;">
+    <button class="win-btn win-btn-primary" onclick="copyLog()">Copy to Clipboard</button>
+    <button class="win-btn" onclick="closeLog()">Close</button>
+  </div>
+</div>
+
+</body>
+</html>

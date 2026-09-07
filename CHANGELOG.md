@@ -24,6 +24,27 @@ COPY RESULTS. Bump `DARTBOT_VERSION` in `assets/js/cricket.js` and the
 - Corrected the Bomb/Rebuild explanations, PPR maths, one-dart grammar, Test Mode stat handling, and
   the four-player spaceship position.
 
+## Add Sink to Zero — 2026-09-07
+
+- Added a new human-first 2–4 player X01 naval target race, separate from Demolish.
+- Added Contract Wars tactical play: dart three of each even-numbered visit can launch a risk/reward
+  Orbital Salvo, reinforce a chosen rival's target, or be ignored for normal scoring.
+- Reinforcement never raises a score: it arms one future double-out visit, cannot stack, and cannot be
+  applied inside the protected 50-point endgame. Tactical effects never add, remove, or steal darts.
+- Added overhead warships, proportional hull damage, shell strikes, splash misses, smoke/fire states,
+  sinking checkout, bust repair, checkout guidance,
+  caller/SFX settings, checkout MP3, manual input, Autodarts handling, winner recovery, and optional
+  compatibility CPUs.
+- Added a detailed design, acceptance, and Claude/Gemini review protocol in
+  `handover/sink-to-zero-design.md`.
+- Applied the completed Claude/Gemini review: stronger target-lock brackets, larger scores and keypad,
+  clearer winner statistics, distinct naval victory spray, cleaner ship SVGs, and improved ship colours.
+- Fixed rapid Undo racing delayed damage animation and prevented Test Mode checkouts from affecting
+  saved human statistics.
+- Added compact alien demolition drones to identify who is firing, atomic tactical Undo, reinforced
+  checkout handling, and a full-width tactical choice display for two-to-four-player games.
+- Added Sink to Zero to the front menu and temporarily hid Pokémon Darts and Bullseye.
+
 ## Baseball: fixes from the first human-vs-human game — 2026-08-08
 Owner played it. "A mess." Four fixes, all from real play rather than simulation.
 
