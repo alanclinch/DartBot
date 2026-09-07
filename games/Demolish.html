@@ -7,11 +7,11 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💥</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/css/game.css?v=2">
-<link rel="stylesheet" href="../assets/css/demolish.css?v=3">
+<link rel="stylesheet" href="../assets/css/demolish.css?v=4">
 <script src="../assets/js/autodarts.js?v=3"></script>
 <script src="../assets/js/utils.js?v=3"></script>
 <script src="../assets/js/demolish-bots.js?v=1"></script>
-<script src="../assets/js/demolish.js?v=7" defer></script>
+<script src="../assets/js/demolish.js?v=8" defer></script>
 </head>
 <body>
 <div id="starfield" aria-hidden="true"></div>
@@ -264,7 +264,7 @@
         <div class="keypad-row">
           <button class="kp-btn" onclick="manualDart(25)" style="flex:2;">BULL</button>
           <button class="kp-btn kp-miss" onclick="manualDart(0)">MISS</button>
-          <button class="kp-btn kp-undo" onclick="undoLastDart()">UNDO</button>
+          <button class="kp-btn kp-undo" onclick="undoLastDart()">UNDO DART</button>
         </div>
         <div class="keypad-row">
           <button class="kp-btn kp-mod" id="kp-mod-double" onclick="toggleKeypadMod(2)">DOUBLE</button>
@@ -287,7 +287,10 @@
         <button class="end-btn" onclick="autodartsReset()" style="flex:1;font-size:11px;border-color:var(--muted);color:var(--muted);">RESET</button>
         <button class="end-btn" onclick="autodartsCalibrate()" style="flex:1;font-size:11px;border-color:var(--muted);color:var(--muted);">CALIBRATE</button>
       </div>
-      <button class="end-btn" id="next-player-btn" onclick="skipTurn()" style="display:none;border-color:var(--green);color:var(--green);margin-bottom:8px;">NEXT PLAYER →</button>
+      <div class="turn-nav">
+        <button class="end-btn back-turn-btn" id="back-turn-btn" onclick="restorePreviousTurn()" disabled>← BACK TURN</button>
+        <button class="end-btn next-player-btn" id="next-player-btn" onclick="skipTurn()" style="display:none;">NEXT PLAYER →</button>
+      </div>
       <button class="end-btn" onclick="quitGame()">↩ Quit to Menu</button>
     </div>
   </div>

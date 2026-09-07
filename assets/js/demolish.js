@@ -588,6 +588,9 @@ let tournamentBestOf = 1;
 let isTeamMatch = false;
 let teamTurnOrder = [];
 let teamTurnCursor = 0;
+let turnHistory = [];
+let manualCorrectionActive = false;
+let fxRevision = 0;
 let tournamentState = null;
 let activeTournamentMatch = null;
 
@@ -859,6 +862,9 @@ function startGame() {
   winLocked = false;
   lastResult = null;
   throwLog = [];
+  turnHistory = [];
+  manualCorrectionActive = false;
+  fxRevision++;
   const winLabel = document.getElementById('win-label');
   const nextLegBtn = document.getElementById('next-leg-btn');
   if (winLabel) winLabel.textContent = 'CHECKED OUT FIRST!';
@@ -1045,6 +1051,7 @@ function registerDart(score, seg) {
 
 function removeGems(pidx, targetRemoved, cb, opts = {}) {
   const p = players[pidx];
+  const revision = fxRevision;
   const start=p.gemsRemoved, end=Math.min(targetRemoved, TOTAL_BLOCKS);
   const ids=[]; for(let i=start;i<end;i++) ids.push(i);
   if (!ids.length) { cb(); return; }
@@ -1068,11 +1075,15 @@ function removeGems(pidx, targetRemoved, cb, opts = {}) {
   const stagger = count>10?10:count>5?18:32;
   ids.forEach((id,i) => {
     setTimeout(() => {
+      if (revision !== fxRevision || players[pidx] !== p) return;
       const el=document.getElementById(`g-${pidx}-${id}`);
       if(el){
         if (count < 28 || i % 2 === 0) spawnDebris(pidx, id);
         el.classList.add('removing');
-        setTimeout(()=>{el.classList.add('gone');el.classList.remove('removing');},200);
+        setTimeout(()=>{
+          if (revision !== fxRevision || players[pidx] !== p) return;
+          el.classList.add('gone');el.classList.remove('removing');
+        },200);
       }
       if(++done===ids.length){ refreshArmedRow(pidx); setTimeout(cb,60); }
     }, fireDelay + i*stagger);
@@ -1124,6 +1135,7 @@ function spawnImpactExplosion(pidx, ids) {
 
 function repairGems(pidx, targetRemoved, cb) {
   const p = players[pidx];
+  const revision = fxRevision;
   const start = p.gemsRemoved;
   const end = Math.max(0, Math.min(targetRemoved, TOTAL_BLOCKS));
   const ids = [];
@@ -1137,6 +1149,7 @@ function repairGems(pidx, targetRemoved, cb) {
   const stagger = count>10?12:count>5?22:38;
   ids.forEach((id, i) => {
     setTimeout(() => {
+      if (revision !== fxRevision || players[pidx] !== p) return;
       const el=document.getElementById(`g-${pidx}-${id}`);
       if(el){
         el.classList.remove('gone','removing');
@@ -1602,8 +1615,88 @@ function runVictoryVolley(winnerIdx, onComplete) {
   setTimeout(onComplete, shots * interval + 700);
 }
 
+function cloneTurnData(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function captureTurnSnapshot() {
+  return cloneTurnData({
+    players, cp, darts, seenThrows, turnEnded, checkedOut, roundCheckedOut,
+    teamTurnCursor, activeBonus, keypadMod,
+  });
+}
+
+function clearTransientFx() {
+  document.querySelectorAll('.stage-laser,.impact-boom,.debris-chip,.tower-overlay,.score-flash')
+    .forEach(el => el.remove());
+}
+
+function renderRestoredDarts() {
+  [0,1,2].forEach(i => {
+    const slot = document.getElementById('dc' + i);
+    if (!slot) return;
+    const dart = darts[i];
+    slot.querySelector('.dart-slot-val').textContent = dart ? dart.display : '—';
+    slot.className = dart ? `dart-slot ${dart.score ? 'scored' : 'miss'}` : 'dart-slot';
+  });
+  const last = darts[darts.length - 1];
+  document.getElementById('last-dart-val').textContent = last ? (last.score || 'MISS') : '—';
+}
+
+function restorePreviousTurn() {
+  if (!gameActive || !turnHistory.length) return false;
+  const snapshot = turnHistory.pop();
+  clearTurnTimers();
+  turnToken++;
+  fxRevision++;
+  clearTransientFx();
+  players = snapshot.players;
+  cp = snapshot.cp;
+  darts = snapshot.darts;
+  // The physical board has normally cleared this completed visit already.
+  // Keep its events muted until the operator explicitly moves forward, so a
+  // stale board state cannot immediately re-apply the dart being corrected.
+  seenThrows = 0;
+  turnEnded = snapshot.turnEnded;
+  checkedOut = snapshot.checkedOut;
+  roundCheckedOut = snapshot.roundCheckedOut;
+  teamTurnCursor = snapshot.teamTurnCursor;
+  activeBonus = snapshot.activeBonus;
+  keypadMod = snapshot.keypadMod || 1;
+  manualCorrectionActive = true;
+  gameActive = true;
+  sdActive = false;
+  hideBonusPopup();
+  hideBonusWarning();
+  showScreen('game');
+  buildTowers();
+  players.forEach((_, i) => { restoreGems(i); updateScore(i); });
+  renderRestoredDarts();
+  highlightActive();
+  aimShipAtPlayer(cp);
+  if (activeBonus) showBonusPopup(activeBonus);
+  updatePanel();
+  return true;
+}
+
+function settleCurrentVisit() {
+  const player = players[cp];
+  if (!player || !darts.length || player.checkedOut) return;
+  const visitTotal = darts.reduce((total, dart) => total + dart.score, 0);
+  const calculated = player.turnStart - visitTotal;
+  player.score = calculated < 0 ? player.turnStart : calculated;
+  restoreGems(cp);
+  updateScore(cp);
+}
+
 function advanceTurn() {
   if(!gameActive)return;
+  settleCurrentVisit();
+  turnHistory.push(captureTurnSnapshot());
+  if (turnHistory.length > 50) turnHistory.shift();
+  manualCorrectionActive = false;
+  fxRevision++;
+  clearTransientFx();
   clearTurnTimers();
   turnToken++;
   activeBonus = null;
@@ -1894,6 +1987,7 @@ function resolveSD() {
 function handleWS(data){
   if(!data||data.type!=='state')return;
   const d=data.data||{},throws=d.throws,event=d.event||'',numThrows=d.numThrows!==undefined?d.numThrows:-1;
+  if(manualCorrectionActive)return;
   const tc=Array.isArray(throws)?throws.length:0;
   if(tc>seenThrows&&(gameActive||sdActive)){
     if(missTimer){clearTimeout(missTimer);missTimer=null;}
@@ -1944,10 +2038,14 @@ function manualDart(num) {
   }
 }
 function undoLastDart() {
-  if (!gameActive || !darts.length) return;
+  if (!gameActive) return;
+  while (!darts.length && turnHistory.length) restorePreviousTurn();
+  if (!darts.length) return;
   const p = players[cp];
-  if (getActiveThrower(p).isCpu) return;
   const removed = darts.pop();
+
+  fxRevision++;
+  clearTransientFx();
 
   // Cancel any delayed bonus application/result left by the removed dart.
   bonusTimers.forEach(id => clearTimeout(id));
@@ -2047,12 +2145,17 @@ function updatePanel(){
   const thrower = getActiveThrower(p);
   const tn=document.getElementById('turn-name');if(tn){tn.textContent=thrower.name;tn.style.color=p.color;}
   const ts=document.getElementById('turn-sub');
-  if(ts)ts.textContent=turnEnded?'Waiting...':`${p.isTeam ? p.name + ' · ' : ''}${thrower.isCpu?'CPU thinking...':'Dart '+(darts.length+1)+' of 3'}`;
+  if(ts)ts.textContent=manualCorrectionActive?'Manual correction · undo or move forward':turnEnded?'Waiting...':`${p.isTeam ? p.name + ' · ' : ''}${thrower.isCpu?'CPU thinking...':'Dart '+(darts.length+1)+' of 3'}`;
   const nb=document.getElementById('next-player-btn');
-  if(nb)nb.style.display=(turnEnded&&!thrower.isCpu&&gameActive)?'':'none';
+  if(nb){
+    nb.style.display=gameActive&&!sdActive?'':'none';
+    nb.textContent=turnEnded?'NEXT PLAYER →':'END TURN →';
+  }
+  const backBtn=document.getElementById('back-turn-btn');
+  if(backBtn)backBtn.disabled=!gameActive||!turnHistory.length;
   document.querySelectorAll('.keypad-wrap .kp-btn').forEach(btn => {
     const isUndo = btn.classList.contains('kp-undo');
-    btn.disabled = thrower.isCpu || !gameActive || (isUndo ? !darts.length : turnEnded);
+    btn.disabled = !gameActive || (isUndo ? (!darts.length&&!turnHistory.length) : (thrower.isCpu||turnEnded));
   });
   updateCheckoutHint();
 }

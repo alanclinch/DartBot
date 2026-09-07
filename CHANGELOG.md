@@ -5,6 +5,15 @@ COPY RESULTS. Bump `DARTBOT_VERSION` in `assets/js/cricket.js` and the
 `#version-badge` text in `games/cricket.html` together, and add an entry here.
 (Placeholder 3-digit scheme `vNNN` for now — will revisit later.)
 
+## Demolish: full manual recovery controls — 2026-09-07
+
+- Made End Turn / Next Player available throughout every live visit so play can continue when the
+  board does not emit its takeout event.
+- Added Back Turn and made Undo Dart cross turn boundaries, allowing an already-advanced visit to be
+  reopened, corrected with the keypad, and completed manually.
+- Restored complete score, tower, bonus, player/team turn, and per-player stat state during corrections,
+  while muting stale board events and cancelling delayed visual changes until the operator moves forward.
+
 ## Demolish: optional teams and tournaments — 2026-09-07
 
 - Added an optional 2v2 mode with one shared tower per team and alternating turns in

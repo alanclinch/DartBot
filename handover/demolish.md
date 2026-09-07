@@ -6,7 +6,7 @@ control; looks are tested on a laptop emulating 1080p). The forward focus for De
 that section matters.
 
 Files: `games/Demolish.html`, `assets/js/demolish.js`, `assets/css/demolish.css`.
-Assets are cache-busted (`demolish.js?v=7`, `demolish.css?v=3`; shared libs aligned to Cricket's versions).
+Assets are cache-busted (`demolish.js?v=8`, `demolish.css?v=4`; shared libs aligned to Cricket's versions).
 
 **What it is:** an **X01-style** game (start at a score, subtract each dart, **check out to exactly 0**;
 last player left standing loses) dressed as a **"demolish the gem tower"** theme — each player's score
@@ -30,8 +30,11 @@ backdrop. CPU difficulty comes from **`BOT_TIERS[cpuId].sigma`** (via `generateC
   `randBonusGap` / `randBonusAmount` / `randBonusTarget`, `prepareBonusForDart`, `showBonusPopup`,
   `showBonusWarning`, bonus SFX (`sfxBonusSiren/Hit/Miss`). Currently: a periodic "hit this random
   target for bonus damage" event with a warning + popup. **This is the hook for "different bonus types".**
-- **Turn flow** — `registerDart`, `checkAfterDart`, `advanceTurn`, `undoLastDart` (turn-local: pops
-  `darts`, recomputes `score = turnStart - soFar`), `skipTurn`.
+- **Turn flow and manual recovery** — `registerDart`, `checkAfterDart`, `advanceTurn`, `undoLastDart`,
+  `restorePreviousTurn`, and `skipTurn`. End Turn is always available. Each completed visit is held in
+  `turnHistory`; Back Turn restores it intact, while Undo Dart automatically crosses into that visit
+  when the board has already advanced. `manualCorrectionActive` ignores stale board input until the
+  operator moves forward, and `fxRevision` prevents delayed animations reapplying corrected damage.
 - **Checkout / win** — `handleCheckout` (sets `gameActive=false`, marks `checkedOut`, runs
   `runVictoryVolley` → `showWin`), sudden death (`triggerSD` / `resolveSD` / `advanceDeadHeat`... — X01
   ties), `showWin` (shows PPR/darts, session series), auto-advance for all-CPU.
@@ -68,6 +71,9 @@ backdrop. CPU difficulty comes from **`BOT_TIERS[cpuId].sigma`** (via `generateC
 - For teams, verify the turn sequence A1, B1, A2, B2 and that each teammate's own stats are saved.
 - For tournaments, cover a bye bracket, a multi-leg match, Back to Game after a false checkout, and
   resume after reload. Standard mode must remain selected by default.
+- Force End Turn with zero, one, and three detected darts. Then test Back Turn and Undo Dart both from
+  an active visit and immediately after Autodarts has advanced; correct the score manually and confirm
+  the next fresh board visit is accepted normally.
 
 ---
 
